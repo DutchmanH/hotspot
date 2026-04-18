@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "Hotspot",
-    "tagline": "Find the perfect date activity"
+    "badge": "Your date guide",
+    "tagline": "Discover the perfect destination for your next date nearby",
+    "cta": "Discover your Hotspot",
+    "hint": "No account needed · Free · Start instantly"
   },
   "categories": {
     "food": "Food & Drinks",
@@ -9,10 +12,50 @@
     "culture": "Culture",
     "activities": "Activities"
   },
+  "onboarding": {
+    "step1Title": "What are you looking for?",
+    "step1Subtitle": "Choose the places you want to see on the map",
+    "skip": "Show all",
+    "next": "Next",
+    "title": "Where are you?",
+    "subtitle": "Share your location or choose a spot on the map",
+    "shareLocation": "Share my location",
+    "manualPin": "Choose a spot",
+    "locating": "Finding location...",
+    "locationError": "Location unavailable. Choose manually.",
+    "clickHint": "Click on the map to set your location"
+  },
+  "filters": {
+    "title": "Filters",
+    "category": "Category",
+    "nuOpen": "Open now",
+    "gratis": "Free entry",
+    "afstand": "Sort by distance"
+  },
   "map": {
+    "radius": "Radius",
     "loading": "Loading POIs...",
-    "noResults": "No places found in this area",
-    "error": "Error loading places"
+    "loadingTitle": "Finding hotspots...",
+    "loadingSub": "Searching for the best spots near you",
+    "t1": "Carefully studying the map...",
+    "t2": "Checking if the coffee is any good...",
+    "t3": "Scouting out romantic parks...",
+    "t4": "Hunting down the best pizza nearby...",
+    "t5": "Scanning for culture and entertainment...",
+    "t6": "The perfect date spot is almost found!",
+    "t7": "Sniffing around the neighbourhood...",
+    "t8": "Hang on — great spots take time!",
+    "errorTitle": "Oops, something went wrong",
+    "errorSub": "Could not load places. Check your connection and try again.",
+    "errorTimeoutTitle": "The server is taking its time 🐢",
+    "errorTimeoutSub": "The map server is a bit busy. We already tried a few times — give it a moment and try again!",
+    "errorRateLimitTitle": "Slow down there 🚦",
+    "errorRateLimitSub": "Too many requests went out at once. Wait a minute and then try again.",
+    "noResults": "No places found",
+    "error": "Error loading places",
+    "yourLocation": "Your location",
+    "retry": "Try again",
+    "changeLocation": "Change location"
   },
   "favorites": {
     "title": "Favorites",
@@ -36,5 +79,29 @@
   "theme": {
     "light": "Light",
     "dark": "Dark"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Appearance",
+    "language": "Language",
+    "adminLogin": "Log in as admin"
+  },
+  "panel": {
+    "locations": "locations",
+    "open": "open",
+    "free": "free",
+    "title1": "🔥 Your hotspots",
+    "title2": "📍 Great spots nearby",
+    "title3": "✨ You don't want to miss these",
+    "title4": "💑 Perfect date spots"
+  },
+  "detail": {
+    "directions": "Get directions",
+    "paid": "Paid entry",
+    "wheelchair": {
+      "yes": "Wheelchair accessible",
+      "no": "Not wheelchair accessible",
+      "limited": "Limited accessibility"
+    }
   }
 }

@@ -20,6 +20,7 @@ export async function initSession(latitude = null, longitude = null, city = null
     latitude,
     longitude,
     city,
+    source: window.location.hostname,
   })
   return sessionId
 }

@@ -8,7 +8,7 @@ i18n.use(initReactI18next).init({
     nl: { translation: nl },
     en: { translation: en },
   },
-  lng: navigator.language.startsWith('nl') ? 'nl' : 'en',
+  lng: localStorage.getItem('hotspot_lang') || 'nl',
   fallbackLng: 'nl',
   interpolation: { escapeValue: false },
 })

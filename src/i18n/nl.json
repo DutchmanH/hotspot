@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "Hotspot",
-    "tagline": "Vind de perfecte dateactiviteit"
+    "badge": "Jouw date-gids",
+    "tagline": "Ontdek de perfecte bestemming voor jullie volgende date in de buurt",
+    "cta": "Ontdek jouw Hotspot",
+    "hint": "Geen account nodig · Gratis · Direct starten"
   },
   "categories": {
     "food": "Eten & Drinken",
@@ -9,10 +12,50 @@
     "culture": "Cultuur",
     "activities": "Activiteiten"
   },
+  "onboarding": {
+    "step1Title": "Wat zoek je?",
+    "step1Subtitle": "Kies de plekken die je wil zien op de kaart",
+    "skip": "Alles weergeven",
+    "next": "Volgende",
+    "title": "Waar ben jij?",
+    "subtitle": "Deel je locatie of kies zelf een plek op de kaart",
+    "shareLocation": "Deel mijn locatie",
+    "manualPin": "Kies zelf een plek",
+    "locating": "Locatie bepalen...",
+    "locationError": "Locatie niet beschikbaar. Kies handmatig.",
+    "clickHint": "Klik op de kaart om jouw locatie in te stellen"
+  },
+  "filters": {
+    "title": "Filters",
+    "category": "Categorie",
+    "nuOpen": "Nu open",
+    "gratis": "Gratis toegang",
+    "afstand": "Sorteren op afstand"
+  },
   "map": {
+    "radius": "Straal",
     "loading": "POIs laden...",
-    "noResults": "Geen plaatsen gevonden in dit gebied",
-    "error": "Fout bij laden van plaatsen"
+    "loadingTitle": "Hotspots zoeken...",
+    "loadingSub": "We zoeken de leukste plekjes in jouw buurt",
+    "t1": "De kaart wordt nauwkeurig bestudeerd...",
+    "t2": "Even checken of de koffie er goed is...",
+    "t3": "Romantische parkjes aan het opsporen...",
+    "t4": "De beste pizzeria in de buurt zoeken...",
+    "t5": "Cultuur en vermaak worden ingescand...",
+    "t6": "De perfecte date-plek is bijna gevonden!",
+    "t7": "Even snuffelen in de buurt...",
+    "t8": "Nog even — goeie plekken kosten tijd!",
+    "errorTitle": "Oeps, dat ging mis",
+    "errorSub": "Kon de plekjes niet laden. Controleer je verbinding en probeer opnieuw.",
+    "errorTimeoutTitle": "De server doet er even over 🐢",
+    "errorTimeoutSub": "De kaartserver is een beetje druk. We hebben al meerdere keren geprobeerd — geef het een momentje en probeer opnieuw!",
+    "errorRateLimitTitle": "Even op de rem trappen 🚦",
+    "errorRateLimitSub": "Er gingen iets te veel verzoekjes tegelijk de deur uit. Wacht een minuutje en probeer dan opnieuw.",
+    "noResults": "Geen plaatsen gevonden",
+    "error": "Fout bij laden van plaatsen",
+    "yourLocation": "Jouw locatie",
+    "retry": "Opnieuw proberen",
+    "changeLocation": "Locatie wijzigen"
   },
   "favorites": {
     "title": "Favorieten",
@@ -36,5 +79,29 @@
   "theme": {
     "light": "Licht",
     "dark": "Donker"
+  },
+  "settings": {
+    "title": "Instellingen",
+    "theme": "Weergave",
+    "language": "Taal",
+    "adminLogin": "Inloggen als admin"
+  },
+  "panel": {
+    "locations": "locaties",
+    "open": "open",
+    "free": "gratis",
+    "title1": "🔥 Jouw hotspots",
+    "title2": "📍 Leuke plekken in de buurt",
+    "title3": "✨ Dit wil je niet missen",
+    "title4": "💑 Perfecte date-spots"
+  },
+  "detail": {
+    "directions": "Routebeschrijving",
+    "paid": "Betaalde toegang",
+    "wheelchair": {
+      "yes": "Rolstoeltoegankelijk",
+      "no": "Niet rolstoeltoegankelijk",
+      "limited": "Beperkt toegankelijk"
+    }
   }
 }
