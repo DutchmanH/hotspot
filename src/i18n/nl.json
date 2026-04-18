@@ -1,0 +1,40 @@
+{
+  "app": {
+    "title": "Hotspot",
+    "tagline": "Vind de perfecte dateactiviteit"
+  },
+  "categories": {
+    "food": "Eten & Drinken",
+    "outdoor": "Buiten",
+    "culture": "Cultuur",
+    "activities": "Activiteiten"
+  },
+  "map": {
+    "loading": "POIs laden...",
+    "noResults": "Geen plaatsen gevonden in dit gebied",
+    "error": "Fout bij laden van plaatsen"
+  },
+  "favorites": {
+    "title": "Favorieten",
+    "empty": "Nog geen favorieten",
+    "add": "Voeg toe aan favorieten",
+    "remove": "Verwijder uit favorieten",
+    "saved": "Opgeslagen!"
+  },
+  "admin": {
+    "title": "Admin",
+    "login": "Inloggen",
+    "email": "E-mailadres",
+    "password": "Wachtwoord",
+    "logout": "Uitloggen",
+    "stats": {
+      "totalSessions": "Totaal sessies",
+      "weekSessions": "Sessies deze week",
+      "topCategories": "Populaire categorieën"
+    }
+  },
+  "theme": {
+    "light": "Licht",
+    "dark": "Donker"
+  }
+}

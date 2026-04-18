@@ -1,0 +1,40 @@
+{
+  "app": {
+    "title": "Hotspot",
+    "tagline": "Find the perfect date activity"
+  },
+  "categories": {
+    "food": "Food & Drinks",
+    "outdoor": "Outdoors",
+    "culture": "Culture",
+    "activities": "Activities"
+  },
+  "map": {
+    "loading": "Loading POIs...",
+    "noResults": "No places found in this area",
+    "error": "Error loading places"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "empty": "No favorites yet",
+    "add": "Add to favorites",
+    "remove": "Remove from favorites",
+    "saved": "Saved!"
+  },
+  "admin": {
+    "title": "Admin",
+    "login": "Log in",
+    "email": "Email address",
+    "password": "Password",
+    "logout": "Log out",
+    "stats": {
+      "totalSessions": "Total sessions",
+      "weekSessions": "Sessions this week",
+      "topCategories": "Popular categories"
+    }
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark"
+  }
+}
