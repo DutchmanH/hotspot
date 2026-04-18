@@ -1,16 +1,97 @@
-# React + Vite
+# Hotspot 📍
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vind de perfecte date-plek in jouw buurt. Hotspot toont restaurants, parken, musea en activiteiten op een interactieve kaart — gratis, zonder account.
 
-Currently, two official plugins are available:
+**Live:** https://hotspot-webhunk.vercel.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Twee-staps onboarding** — kies categorieën en "nu open" filter vóór je locatie deelt
+- **Interactieve kaart** — Leaflet + OpenStreetMap met POIs van de Overpass API
+- **Categorieën** — Eten & Drinken, Buiten, Cultuur, Activiteiten
+- **Locatiepaneel** — swipeable bottom sheet (mobiel) en inklapbare sidebar (desktop)
+- **POI detail modal** — adres, openingstijden, fee, rolstoeltoegankelijkheid, routebeschrijving
+- **Filters** — categorie, straal, nu open, gratis, sorteren op afstand
+- **Favorieten** — opslaan in localStorage
+- **Dark / light mode** + **NL / EN** taalswitch
+- **SEO landing page** — JSON-LD, meta tags, FAQ, hoe-het-werkt secties
+- **Sessie tracking** — anoniem via UUID → Supabase (onderscheid localhost vs live)
+- **Admin dashboard** — statistieken op `/admin` (Supabase Auth)
 
-## Expanding the ESLint configuration
+## Tech stack
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Laag | Technologie |
+|---|---|
+| UI | React 19 + Vite |
+| Kaart | Leaflet + react-leaflet |
+| Data | OpenStreetMap via Overpass API |
+| Backend | Supabase (PostgreSQL + Auth) |
+| i18n | react-i18next |
+| Routing | react-router-dom |
+| Icons | lucide-react |
+| Deploy | Vercel |
+
+## Lokaal draaien
+
+**Vereisten:** Node.js v18+
+
+```bash
+git clone https://github.com/DutchmanH/hotspot.git
+cd hotspot
+npm install
+cp .env.example .env   # vul de waarden in
+npm run dev            # http://localhost:5173
+```
+
+### Omgevingsvariabelen
+
+```env
+VITE_SUPABASE_URL=https://qonwkqxsvitnbniaoxgg.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon key>
+```
+
+## Deployen
+
+Elke push naar `main` triggert automatisch een productie-deploy via GitHub Actions → Vercel.
+
+### Eerste keer instellen
+
+1. Maak een Vercel token aan via **vercel.com → Account Settings → Tokens**
+2. Voeg het toe als GitHub secret: **repo → Settings → Secrets → `VERCEL_TOKEN`**
+
+Daarna deploy elke `git push origin main` automatisch naar productie. Pull requests krijgen een preview-URL.
+
+```bash
+npm run build   # lokale productie-build testen
+```
+
+## Projectstructuur
+
+```
+src/
+├── components/
+│   ├── Map.jsx              # Leaflet kaart + user pin
+│   ├── LocationsPanel.jsx   # POI lijst (sidebar / bottom sheet)
+│   ├── POIDetailModal.jsx   # Detail modal per locatie
+│   ├── FilterModal.jsx      # Filters modal
+│   ├── RadiusControl.jsx    # Straal slider
+│   ├── Onboarding.jsx       # Twee-staps onboarding
+│   ├── LoadingOverlay.jsx   # Loading + error states
+│   └── SettingsModal.jsx    # Thema & taal instellingen
+├── pages/
+│   ├── Landing.jsx          # SEO landing pagina
+│   ├── Kaart.jsx            # Hoofd kaart pagina
+│   └── Admin.jsx            # Admin dashboard
+├── lib/
+│   ├── overpass.js          # Overpass API (retry + cancellation)
+│   ├── supabase.js          # Supabase client
+│   └── session.js           # Anonieme sessie tracking
+├── hooks/
+│   ├── useTheme.js          # Dark/light mode
+│   └── useFavorites.js      # Favorieten CRUD
+└── i18n/
+    ├── nl.json              # Nederlandse vertalingen
+    └── en.json              # Engelse vertalingen
+```
