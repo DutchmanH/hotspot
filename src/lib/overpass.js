@@ -89,6 +89,137 @@ function delay(ms, signal) {
   })
 }
 
+// ─────────────────────────────────────────────
+// Vertaaltabellen OSM-tagwaarden → Nederlands
+// ─────────────────────────────────────────────
+const AMENITY_NAMES = {
+  restaurant: 'Restaurant',
+  cafe:       'Café',
+  bar:        'Bar',
+  fast_food:  'Snackbar',
+  pub:        'Café',
+  theatre:    'Theater',
+  cinema:     'Bioscoop',
+  ice_cream:  'IJssalon',
+  food_court: 'Foodcourt',
+  nightclub:  'Club',
+}
+
+const LEISURE_NAMES = {
+  park:            'Park',
+  nature_reserve:  'Natuurreservaat',
+  sports_centre:   'Sportcentrum',
+  fitness_centre:  'Fitnesscentrum',
+  bowling_alley:   'Bowlingbaan',
+  escape_game:     'Escape room',
+  miniature_golf:  'Minigolf',
+  golf_course:     'Golfbaan',
+  garden:          'Tuin',
+  playground:      'Speeltuin',
+  pitch:           'Sportveld',
+  stadium:         'Stadion',
+  swimming_pool:   'Zwembad',
+  water_park:      'Waterpark',
+  horse_riding:    'Manege',
+  ice_rink:        'Ijsbaan',
+  track:           'Atletiekbaan',
+  dog_park:        'Hondenpark',
+}
+
+const TOURISM_NAMES = {
+  museum:      'Museum',
+  gallery:     'Galerie',
+  viewpoint:   'Uitkijkpunt',
+  picnic_site: 'Picknickplaats',
+  attraction:  'Attractie',
+  artwork:     'Kunstwerk',
+  zoo:         'Dierentuin',
+  theme_park:  'Pretpark',
+  aquarium:    'Aquarium',
+  camp_site:   'Camping',
+  information: 'Informatiepunt',
+}
+
+const HISTORIC_NAMES = {
+  castle:               'Kasteel',
+  monument:             'Monument',
+  memorial:             'Gedenkteken',
+  ruins:                'Ruïne',
+  fort:                 'Fort',
+  manor:                'Landhuis',
+  city_gate:            'Stadspoort',
+  windmill:             'Molen',
+  tower:                'Historische toren',
+  ship:                 'Historisch schip',
+  building:             'Historisch gebouw',
+  church:               'Kerk',
+  archaeological_site:  'Archeologische vindplaats',
+  battlefield:          'Slagveld',
+  industrial:           'Industrieel erfgoed',
+  milestone:            'Mijlpaal',
+  wayside_cross:        'Wegkruis',
+  wayside_shrine:       'Kapelletje',
+  yes:                  'Historisch monument',
+}
+
+// Keuken-prefix voor restaurants/snackbars
+const CUISINE_PREFIX = {
+  italian:       'Italiaans',
+  french:        'Frans',
+  chinese:       'Chinees',
+  japanese:      'Japans',
+  indian:        'Indiaas',
+  thai:          'Thais',
+  turkish:       'Turks',
+  greek:         'Grieks',
+  mexican:       'Mexicaans',
+  spanish:       'Spaans',
+  american:      'Amerikaans',
+  vietnamese:    'Vietnamees',
+  korean:        'Koreaans',
+  pizza:         'Pizza',
+  burger:        'Burger',
+  sushi:         'Sushi',
+  kebab:         'Kebab',
+  fish_and_chips:'Fish & chips',
+  sandwich:      'Broodjes',
+  pancake:       'Pannenkoeken',
+  steak_house:   'Steakhouse',
+}
+
+/**
+ * Geeft een leesbare Nederlandse naam terug voor een POI.
+ * Probeert echte naam-tags eerst, dan een type-beschrijving op basis van OSM-tags.
+ */
+function getDisplayName(tags) {
+  // 1. Echte naam
+  const real = tags.name || tags['name:nl'] || tags['name:en'] || tags.brand || tags.operator
+  if (real) return real
+
+  // 2. Eten & drinken — verrijk met keukentype indien aanwezig
+  if (tags.amenity && AMENITY_NAMES[tags.amenity]) {
+    const base = AMENITY_NAMES[tags.amenity]
+    if (tags.cuisine && (tags.amenity === 'restaurant' || tags.amenity === 'fast_food')) {
+      // cuisine kan meerdere waarden hebben (bijv. "pizza;italian"), neem de eerste
+      const firstCuisine = tags.cuisine.split(/[;,]/)[0].trim()
+      const prefix = CUISINE_PREFIX[firstCuisine]
+      if (prefix) return `${prefix}${base === 'Restaurant' ? 'restaurant' : base.toLowerCase()}`
+    }
+    return base
+  }
+
+  // 3. Leisure
+  if (tags.leisure && LEISURE_NAMES[tags.leisure]) return LEISURE_NAMES[tags.leisure]
+
+  // 4. Toerisme
+  if (tags.tourism && TOURISM_NAMES[tags.tourism]) return TOURISM_NAMES[tags.tourism]
+
+  // 5. Historisch
+  if (tags.historic) return HISTORIC_NAMES[tags.historic] || 'Historisch monument'
+
+  return 'Onbekend'
+}
+
 function boundsFromRadius(lat, lng, radiusKm) {
   const R = 6371
   const dLat = (radiusKm / R) * (180 / Math.PI)
@@ -111,7 +242,7 @@ function parseElements(elements, category) {
       id: String(el.id),
       lat: el.lat ?? el.center.lat,
       lng: el.lon ?? el.center.lon,
-      name: el.tags?.name || el.tags?.['name:nl'] || 'Onbekend',
+      name: getDisplayName(el.tags || {}),
       tags: el.tags || {},
       category,
     }))
@@ -156,7 +287,7 @@ export async function fetchAllPOIs(lat, lng, radiusKm) {
           id: String(el.id),
           lat: el.lat ?? el.center.lat,
           lng: el.lon ?? el.center.lon,
-          name: tags.name || tags['name:nl'] || 'Onbekend',
+          name: getDisplayName(tags),
           tags,
           category,
         }

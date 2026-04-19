@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SlidersHorizontal, Heart, ChevronRight } from 'lucide-react'
-import POIDetailModal from './POIDetailModal'
 
 const CATEGORY_COLORS = {
   food:       '#E8643A',
@@ -27,13 +26,12 @@ function isOpenNow(opening_hours) {
 }
 
 export default function LocationsPanel({
-  pois, userLocation, onFlyTo,
+  pois, userLocation, onFlyTo, onSelectPoi,
   onAddFavorite, onRemoveFavorite, isFavorite,
   onOpenFilters, activeFilterCount,
 }) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
-  const [selectedPoi, setSelectedPoi] = useState(null)
   const [dragOffset, setDragOffset] = useState(0)
   const touchStartY = useRef(null)
   const isDragging = useRef(false)
@@ -43,7 +41,7 @@ export default function LocationsPanel({
 
   const handleCardClick = (poi) => {
     onFlyTo(poi)
-    setSelectedPoi(poi)
+    onSelectPoi(poi)
   }
 
   // ── Swipe handlers (mobile bottom sheet) ──
@@ -175,15 +173,6 @@ export default function LocationsPanel({
         )}
       </div>
 
-      {selectedPoi && (
-        <POIDetailModal
-          poi={selectedPoi}
-          isFavorite={isFavorite}
-          onAddFavorite={onAddFavorite}
-          onRemoveFavorite={onRemoveFavorite}
-          onClose={() => setSelectedPoi(null)}
-        />
-      )}
     </div>
   )
 }

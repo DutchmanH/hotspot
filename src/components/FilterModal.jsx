@@ -1,79 +1,250 @@
+// @ts-nocheck
 import { createPortal } from 'react-dom'
-import { useTranslation } from 'react-i18next'
-import { X, UtensilsCrossed, Trees, Landmark, Zap } from 'lucide-react'
-import RadiusControl from './RadiusControl'
 
-const CATEGORIES = [
-  { key: 'food',       icon: UtensilsCrossed, color: '#E8643A' },
-  { key: 'outdoor',    icon: Trees,           color: '#7A9E6A' },
-  { key: 'culture',    icon: Landmark,        color: '#D4A853' },
-  { key: 'activities', icon: Zap,             color: '#C4501E' },
+/* ── Translations ─────────────────────────────────────────────── */
+const COPY = {
+  nl: {
+    title: 'Filters',
+    cats: 'Categorieën',
+    radius: 'Straal',
+    price: 'Prijs',
+    any: 'Alles',
+    free: 'Gratis',
+    openNow: 'Alleen nu geopend',
+    reset: 'Wis alles',
+    apply: 'Toepassen',
+    cats_map: { food: 'Eten & drinken', outdoor: 'Buiten', culture: 'Cultuur', activities: 'Activiteiten' },
+  },
+  en: {
+    title: 'Filters',
+    cats: 'Categories',
+    radius: 'Radius',
+    price: 'Price',
+    any: 'Any',
+    free: 'Free',
+    openNow: 'Only open now',
+    reset: 'Clear all',
+    apply: 'Apply',
+    cats_map: { food: 'Food & drinks', outdoor: 'Outdoors', culture: 'Culture', activities: 'Activities' },
+  },
+}
+
+const CATS = ['food', 'outdoor', 'culture', 'activities']
+const CAT_HEX = {
+  food: '#d97050', outdoor: '#5a9e60', culture: '#9060c0', activities: '#c8a030',
+}
+
+const RADIUS_OPTIONS = [
+  { label: '300m', value: 300 },
+  { label: '800m', value: 800 },
+  { label: '2 km', value: 2000 },
+  { label: '5 km', value: 5000 },
+  { label: '∞',    value: 99999 },
 ]
 
-export default function FilterModal({
-  activeCategories, onToggleCategory,
-  radius, onRadiusChange,
-  filterNuOpen, onToggleNuOpen,
-  filterGratis, onToggleGratis,
-  sortByDistance, onToggleDistance,
-  onClose,
-}) {
-  const { t } = useTranslation()
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  )
+}
 
-  return createPortal(
-    <div className="poi-detail-backdrop" onClick={onClose}>
-      <div className="filter-modal-centered" onClick={e => e.stopPropagation()}>
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.14em',
+      textTransform: 'uppercase', color: 'var(--ink-faint)',
+      marginBottom: 10, marginTop: 20,
+    }}>{children}</div>
+  )
+}
 
-        {/* Header */}
-        <div className="poi-detail-header" style={{ borderTopColor: 'var(--accent)' }}>
-          <h2 className="poi-detail-name">{t('filters.title')}</h2>
-          <button className="modal-close" onClick={onClose}><X size={18} /></button>
-        </div>
+function PillRow({ options, value, onChange, multi = false }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {options.map(opt => {
+        const active = multi ? (value || []).includes(opt.value) : value === opt.value
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              padding: '7px 14px', borderRadius: 'var(--r-pill)',
+              background: active ? 'var(--ink)' : 'var(--bg)',
+              color: active ? 'var(--bg)' : 'var(--ink-soft)',
+              border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
+              fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', transition: 'all .15s',
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
-        <div className="filter-modal-body">
-          {/* Categories — multi-select pills */}
-          <div className="filter-section-label">{t('filters.category')}</div>
-          <div className="filter-cat-pills">
-            {CATEGORIES.map(({ key, icon: CatIcon, color }) => {
-              const active = activeCategories.includes(key)
-              return (
-                <button
-                  key={key}
-                  className={`filter-cat-pill ${active ? 'active' : ''}`}
-                  style={/** @type {any} */(active ? { background: color, borderColor: color } : { '--pill-color': color })}
-                  onClick={() => onToggleCategory(key)}
-                >
-                  <CatIcon size={15} />
-                  <span>{t(`categories.${key}`)}</span>
-                </button>
-              )
-            })}
-          </div>
+function Toggle({ label, value, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 0', background: 'transparent', border: 'none',
+        cursor: 'pointer', color: 'var(--ink)', fontFamily: 'var(--font-sans)', fontSize: 14,
+        borderBottom: '1px solid var(--line-soft)',
+      }}
+    >
+      <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
+      <div style={{
+        width: 38, height: 22, borderRadius: 11,
+        background: value ? 'var(--accent)' : 'var(--line)',
+        position: 'relative', transition: 'background .2s', flexShrink: 0,
+      }}>
+        <div style={{
+          position: 'absolute', top: 3, left: value ? 19 : 3,
+          width: 16, height: 16, borderRadius: '50%',
+          background: 'white', transition: 'left .2s',
+        }} />
+      </div>
+    </button>
+  )
+}
 
-          <div className="setting-divider" />
+function Body({ lang, filters, setFilters, activeCats, onToggleCat, onClose, embedded }) {
+  const c = COPY[lang] || COPY.nl
 
-          {/* Radius */}
-          <div className="filter-section-label">{t('map.radius')}</div>
-          <RadiusControl radius={radius} onChange={onRadiusChange} />
+  function resetAll() {
+    setFilters({ radius: 99999, price: 'any', openOnly: false, minRating: 0 })
+    onToggleCat('all')
+  }
 
-          <div className="setting-divider" />
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '20px 24px 0',
+        flexShrink: 0,
+      }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontStyle: 'italic' }}>{c.title}</h2>
+        <button onClick={onClose} style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'var(--bg)', border: '1px solid var(--line-soft)',
+          display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--ink)',
+        }}>
+          <CloseIcon />
+        </button>
+      </div>
 
-          {/* Toggles */}
-          {[
-            { label: t('filters.nuOpen'),  value: filterNuOpen,   toggle: onToggleNuOpen  },
-            { label: t('filters.gratis'),  value: filterGratis,   toggle: onToggleGratis  },
-            { label: t('filters.afstand'), value: sortByDistance,  toggle: onToggleDistance },
-          ].map(({ label, value, toggle }) => (
-            <div key={label} className="setting-row">
-              <span className="setting-label-text">{label}</span>
-              <button className="setting-toggle" onClick={toggle}>
-                <span className={`toggle-track ${value ? 'active' : ''}`}>
-                  <span className="toggle-thumb" />
-                </span>
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+
+        {/* Categories */}
+        <SectionLabel>{c.cats}</SectionLabel>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {CATS.map(id => {
+            const active = activeCats.includes(id)
+            const color = CAT_HEX[id]
+            return (
+              <button key={id} onClick={() => onToggleCat(id)} style={{
+                padding: '8px 14px', borderRadius: 'var(--r-pill)',
+                background: active
+                  ? `color-mix(in oklab, ${color} 18%, var(--bg-elev))`
+                  : 'var(--bg)',
+                color: active ? color : 'var(--ink-soft)',
+                border: `1.5px solid ${active ? color + 'aa' : 'var(--line)'}`,
+                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', transition: 'all .15s',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: color, opacity: active ? 1 : .4,
+                  display: 'inline-block',
+                }}/>
+                {c.cats_map[id]}
               </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
+
+        {/* Radius */}
+        <SectionLabel>{c.radius}</SectionLabel>
+        <PillRow
+          options={RADIUS_OPTIONS}
+          value={filters.radius ?? 99999}
+          onChange={v => setFilters(f => ({ ...f, radius: v }))}
+        />
+
+        {/* Price */}
+        <SectionLabel>{c.price}</SectionLabel>
+        <PillRow
+          options={[{ label: c.any, value: 'any' }, { label: c.free, value: 'free' }]}
+          value={filters.price ?? 'any'}
+          onChange={v => setFilters(f => ({ ...f, price: v }))}
+        />
+
+        {/* Open only */}
+        <div style={{ marginTop: 16 }}>
+          <Toggle
+            label={c.openNow}
+            value={!!filters.openOnly}
+            onChange={v => setFilters(f => ({ ...f, openOnly: v }))}
+          />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        display: 'flex', gap: 10, padding: '16px 24px 24px',
+        borderTop: '1px solid var(--line-soft)', flexShrink: 0,
+      }}>
+        <button onClick={resetAll} style={{
+          flex: 1, padding: '12px', borderRadius: 'var(--r-pill)',
+          background: 'var(--bg)', color: 'var(--ink)',
+          border: '1px solid var(--line)', cursor: 'pointer',
+          fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
+        }}>{c.reset}</button>
+        <button onClick={onClose} style={{
+          flex: 2, padding: '12px', borderRadius: 'var(--r-pill)',
+          background: 'var(--ink)', color: 'var(--bg)',
+          border: 'none', cursor: 'pointer',
+          fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600,
+        }}>{c.apply}</button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Export ─────────────────────────────────────────────────────── */
+export default function FilterModal(props) {
+  // `embedded` = parent (DtModal or BottomSheet) provides container
+  if (props.embedded) return <Body {...props} />
+
+  // Mobile: portal + slide-up sheet
+  return createPortal(
+    <div onClick={props.onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 150,
+      background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'flex-end',
+    }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxHeight: '80vh',
+          background: 'var(--bg-elev)',
+          borderRadius: '28px 28px 0 0',
+          boxShadow: 'var(--shadow-sheet)',
+          display: 'flex', flexDirection: 'column',
+          animation: 'hs-slide-up .35s var(--ease) both',
+          border: '1px solid var(--line-soft)',
+        }}
+      >
+        <div style={{ width: 40, height: 4, borderRadius: 3, background: 'var(--line)', margin: '10px auto 0', flexShrink: 0 }} />
+        <Body {...props} />
       </div>
     </div>,
     document.body
