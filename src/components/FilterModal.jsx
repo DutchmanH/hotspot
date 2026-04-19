@@ -116,7 +116,17 @@ function Body({ lang, filters, setFilters, onClose, embedded }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        flex: embedded ? undefined : 1,
+        minHeight: embedded ? undefined : 0,
+        height: '100%',
+        maxHeight: '100%',
+        overflow: 'hidden',
+      }}
+    >
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -192,20 +202,23 @@ export default function FilterModal(props) {
   // Mobile: portal + slide-up sheet
   return createPortal(
     <div onClick={props.onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 150,
+      position: 'fixed', inset: 0, zIndex: 420,
       background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(2px)',
       display: 'flex', alignItems: 'flex-end',
     }}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxHeight: '80vh',
+          width: '100%',
+          height: 'min(78vh, 720px)',
+          maxHeight: '90vh',
           background: 'var(--bg-elev)',
           borderRadius: '28px 28px 0 0',
           boxShadow: 'var(--shadow-sheet)',
           display: 'flex', flexDirection: 'column',
           animation: 'hs-slide-up .35s var(--ease) both',
           border: '1px solid var(--line-soft)',
+          overflow: 'hidden',
         }}
       >
         <div style={{ width: 40, height: 4, borderRadius: 3, background: 'var(--line)', margin: '10px auto 0', flexShrink: 0 }} />

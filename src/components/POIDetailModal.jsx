@@ -189,7 +189,7 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
             )}
           </div>
           <div>
-            {open !== false && (
+            {open === true && (
               <span style={{
                 padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11,
                 background: 'oklch(0.70 0.16 145 / .22)', color: 'oklch(0.40 0.16 145)',
@@ -261,13 +261,26 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
           {fav ? c.unfav : c.fav}
         </button>
         <a
-          href={gmUrl} target="_blank" rel="noopener noreferrer"
+          href={gmUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           style={{
-            flex: 1, padding: '12px', borderRadius: 'var(--r-pill)',
-            background: 'var(--ink)', color: 'var(--bg)',
-            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600,
+            flex: 1,
+            padding: '14px 16px',
+            borderRadius: 'var(--r-pill)',
+            background: 'var(--accent)',
+            color: 'var(--accent-ink)',
+            border: '2px solid color-mix(in oklch, var(--accent-ink) 22%, transparent)',
+            boxShadow: '0 4px 18px color-mix(in oklch, var(--accent) 45%, transparent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            fontFamily: 'var(--font-sans)',
+            fontSize: 15,
+            fontWeight: 700,
             textDecoration: 'none',
+            cursor: 'pointer',
           }}
         >
           <NavIcon /> {c.route}
@@ -283,7 +296,7 @@ export default function POIDetailModal(props) {
 
   return createPortal(
     <div onClick={props.onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 150,
+      position: 'fixed', inset: 0, zIndex: 420,
       background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(2px)',
       display: 'flex', alignItems: 'flex-end',
     }}>

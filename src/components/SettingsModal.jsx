@@ -162,7 +162,7 @@ export default function SettingsModal(props) {
 
   return createPortal(
     <div onClick={props.onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 150,
+      position: 'fixed', inset: 0, zIndex: 420,
       background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(2px)',
       display: 'flex', alignItems: 'flex-end',
     }}>

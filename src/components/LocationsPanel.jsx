@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SlidersHorizontal, Heart, ChevronRight } from 'lucide-react'
+import { evaluateOpenState } from '../lib/openingHours'
 
 const CATEGORY_COLORS = {
   food:       '#E8643A',
@@ -17,12 +18,6 @@ function calcDistance(lat1, lng1, lat2, lng2) {
   const dLng = (lng2 - lng1) * Math.PI / 180
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-function isOpenNow(opening_hours) {
-  if (!opening_hours) return null
-  if (opening_hours === '24/7') return true
-  return null
 }
 
 export default function LocationsPanel({
@@ -132,7 +127,7 @@ export default function LocationsPanel({
             const dist = userLocation?.lat
               ? calcDistance(userLocation.lat, userLocation.lng, poi.lat, poi.lng)
               : null
-            const open = isOpenNow(poi.tags?.opening_hours)
+            const open = evaluateOpenState(poi.tags?.opening_hours)
             const isFree = !poi.tags?.fee || poi.tags.fee === 'no'
             const fav = isFavorite(poi.id)
 

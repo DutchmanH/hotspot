@@ -11,6 +11,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import AuthModal from "../components/AuthModal";
 import { useFavorites } from "../hooks/useFavorites";
 import { useTheme } from "../hooks/useTheme";
+import { evaluateOpenState } from "../lib/openingHours";
 import { fetchAllPOIs } from "../lib/overpass";
 import { initSession } from "../lib/session";
 import { useAuth } from "../context/AuthContext";
@@ -1788,12 +1789,6 @@ function calcDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function isOpenNow(oh) {
-  if (!oh) return null;
-  if (oh === "24/7") return true;
-  return null;
-}
-
 // ── Media query hook ────────────────────────────────────────────────────────
 function useIsDesktop(breakpoint = 900) {
   const [isDesktop, setIsDesktop] = useState(
@@ -1929,7 +1924,7 @@ export default function Kaart() {
         .map((p) => ({
           ...p,
           _dist: calcDistance(lat, lng, p.lat, p.lng),
-          _open: isOpenNow(p.tags?.opening_hours),
+          _open: evaluateOpenState(p.tags?.opening_hours),
         }))
         .sort((a, b) => a._dist - b._dist);
       setAllPois(enriched);
@@ -2015,7 +2010,7 @@ export default function Kaart() {
     let list = allPois;
     if (activeCats.length > 0)
       list = list.filter((p) => activeCats.includes(p.category));
-    if (filters.openOnly) list = list.filter((p) => p._open !== false);
+    if (filters.openOnly) list = list.filter((p) => p._open === true);
     if (filters.radius < 99999)
       list = list.filter((p) => (p._dist || 0) * 1000 <= filters.radius);
     if (filters.price === "free")
