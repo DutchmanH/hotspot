@@ -5,29 +5,37 @@ import { supabase } from '../lib/supabase'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser]           = useState(null)
-  const [loading, setLoading]     = useState(true)
-  // true when user followed a password-reset link — show reset-password UI
+  const [user, setUser]             = useState(null)
+  const [role, setRole]             = useState(null)  // 'user' | 'admin' | null
+  const [loading, setLoading]       = useState(true)
   const [recovering, setRecovering] = useState(false)
 
+  async function fetchRole(userId) {
+    if (!userId) { setRole(null); return }
+    const { data } = await supabase.rpc('get_my_role')
+    setRole(data ?? 'user')
+  }
+
   useEffect(() => {
-    // Get current session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      fetchRole(session?.user?.id ?? null)
       setLoading(false)
     })
 
-    // Listen for all auth events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
+      fetchRole(session?.user?.id ?? null)
       setRecovering(event === 'PASSWORD_RECOVERY')
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
+  const isAdmin = role === 'admin'
+
   return (
-    <AuthContext.Provider value={{ user, loading, recovering }}>
+    <AuthContext.Provider value={{ user, role, isAdmin, loading, recovering }}>
       {children}
     </AuthContext.Provider>
   )
