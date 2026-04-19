@@ -10,8 +10,8 @@ const COPY = {
     skip: 'Overslaan',
     step1of2: 'STAP 1 VAN 2',
     step2of2: 'STAP 2 VAN 2',
-    title1: 'Waar ben je\nin voor?',
-    sub1: 'Kies één of meer. Je kunt dit later wijzigen.',
+    title1: 'Wat mag er vanavond\nop je lijstje?',
+    sub1: 'Kies wat past — één ding of alles tegelijk. Later wijzigen kan altijd.',
     next: 'Volgende',
     openOnly: 'Alleen plekken die nu open zijn',
     openOnlySub: 'Gesloten plekken worden verborgen.',
@@ -35,8 +35,8 @@ const COPY = {
     skip: 'Skip',
     step1of2: 'STEP 1 OF 2',
     step2of2: 'STEP 2 OF 2',
-    title1: 'What are you in the\nmood for?',
-    sub1: 'Pick one or more. You can change this later.',
+    title1: 'What\'s on your\nlist tonight?',
+    sub1: 'Pick what fits — one category or a mix. You can change this anytime.',
     next: 'Next',
     openOnly: 'Only places open now',
     openOnlySub: 'Hide places that are closed.',
@@ -144,7 +144,7 @@ function makePinIcon() {
 const PIN_ICON = makePinIcon()
 
 /* ── Step 1 ───────────────────────────────────────────────────── */
-function Step1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSkip }) {
+function Step1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSkip, onHome }) {
   return (
     <div style={{
       position: 'absolute', inset: 0,
@@ -158,13 +158,22 @@ function Step1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSk
         padding: '16px 20px 0',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Hotspot home"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'inherit', padding: 0, margin: 0,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 2C7.5 2 4 5.5 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.5-3.5-8-8-8z" fill="var(--accent)"/>
             <circle cx="12" cy="10" r="3.2" fill="var(--bg)"/>
           </svg>
           <span style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 20, lineHeight: 1 }}>Hotspot</span>
-        </div>
+        </button>
         <button onClick={onSkip} style={{
           background: 'transparent', border: 'none', cursor: 'pointer',
           fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '.1em',
@@ -301,7 +310,7 @@ function Step1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSk
 }
 
 /* ── Map picker (used by both GPS and manual paths) ──────────── */
-function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, theme }) {
+function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, onHome, theme }) {
   const [pinLoc, setPinLoc] = useState(initialPin || null)
 
   useEffect(() => {
@@ -342,7 +351,7 @@ function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, theme }) 
       </MapContainer>
 
       {/* Back button */}
-      <button onClick={onBack} style={{
+      <button type="button" onClick={onBack} aria-label={c.back} style={{
         position: 'absolute', top: 20, left: 16, zIndex: 20,
         width: 40, height: 40, borderRadius: '50%',
         background: 'var(--bg-elev)', color: 'var(--ink)',
@@ -354,6 +363,34 @@ function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, theme }) 
           <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
         </svg>
       </button>
+
+      {onHome && (
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Hotspot home"
+          style={{
+            position: 'absolute', top: 20, right: 16, zIndex: 20,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px 6px 8px',
+            borderRadius: 'var(--r-pill, 999px)',
+            background: 'var(--bg-elev)', color: 'var(--ink)',
+            border: '1px solid var(--line-soft)',
+            boxShadow: '0 2px 8px rgba(0,0,0,.15)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 18,
+            lineHeight: 1,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M12 2C7.5 2 4 5.5 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.5-3.5-8-8-8z" fill="var(--accent)"/>
+            <circle cx="12" cy="10" r="3.2" fill="var(--bg)"/>
+          </svg>
+          Hotspot
+        </button>
+      )}
 
       {/* Instruction card — no pin yet */}
       {!pinLoc && (
@@ -430,7 +467,7 @@ function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, theme }) 
 }
 
 /* ── Step 2: location choice ──────────────────────────────────── */
-function Step2({ c, radius, setRadius, onDone, onBack, theme }) {
+function Step2({ c, radius, setRadius, onDone, onBack, onHome, theme }) {
   const [view, setView] = useState('choice') // 'choice' | 'map'
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError, setGpsError] = useState(false)
@@ -458,6 +495,7 @@ function Step2({ c, radius, setRadius, onDone, onBack, theme }) {
         initialPin={gpsPin}
         onDone={onDone}
         onBack={() => { setView('choice'); setGpsPin(null) }}
+        onHome={onHome}
         theme={theme}
       />
     )
@@ -472,13 +510,22 @@ function Step2({ c, radius, setRadius, onDone, onBack, theme }) {
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Hotspot home"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'inherit', padding: 0, margin: 0,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 2C7.5 2 4 5.5 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.5-3.5-8-8-8z" fill="var(--accent)"/>
             <circle cx="12" cy="10" r="3.2" fill="var(--bg)"/>
           </svg>
           <span style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 20, lineHeight: 1 }}>Hotspot</span>
-        </div>
+        </button>
         <button onClick={onBack} style={{
           background: 'transparent', border: 'none', cursor: 'pointer',
           fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '.08em',
@@ -578,7 +625,7 @@ function Step2({ c, radius, setRadius, onDone, onBack, theme }) {
 }
 
 /* ── Desktop modal wrapper for step 1 ────────────────────────── */
-function DesktopStep1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSkip }) {
+function DesktopStep1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSkip, onHome }) {
   return (
     <div style={{
       background: 'var(--bg-elev)',
@@ -593,13 +640,22 @@ function DesktopStep1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNex
     }}>
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Hotspot home"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'inherit', padding: 0, margin: 0,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 2C7.5 2 4 5.5 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.5-3.5-8-8-8z" fill="var(--accent)"/>
             <circle cx="12" cy="10" r="3.2" fill="var(--bg-elev)"/>
           </svg>
           <span style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 18 }}>Hotspot</span>
-        </div>
+        </button>
         <button onClick={onSkip} style={{
           background: 'transparent', border: 'none', cursor: 'pointer',
           fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.1em',
@@ -714,7 +770,7 @@ function DesktopStep1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNex
 }
 
 /* ── Desktop modal wrapper for step 2 ────────────────────────── */
-function DesktopStep2({ c, radius, setRadius, onDone, onBack, theme }) {
+function DesktopStep2({ c, radius, setRadius, onDone, onBack, onHome, theme }) {
   const [view, setView] = useState('choice') // 'choice' | 'map'
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError, setGpsError] = useState(false)
@@ -748,6 +804,7 @@ function DesktopStep2({ c, radius, setRadius, onDone, onBack, theme }) {
           initialPin={gpsPin}
           onDone={onDone}
           onBack={() => { setView('choice'); setGpsPin(null) }}
+          onHome={onHome}
           theme={theme}
         />
       </div>
@@ -763,13 +820,22 @@ function DesktopStep2({ c, radius, setRadius, onDone, onBack, theme }) {
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Hotspot home"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'inherit', padding: 0, margin: 0,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 2C7.5 2 4 5.5 4 10c0 5.5 8 12 8 12s8-6.5 8-12c0-4.5-3.5-8-8-8z" fill="var(--accent)"/>
             <circle cx="12" cy="10" r="3.2" fill="var(--bg-elev)"/>
           </svg>
           <span style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 18 }}>Hotspot</span>
-        </div>
+        </button>
         <button onClick={onBack} style={{
           background: 'transparent', border: 'none', cursor: 'pointer',
           fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.08em',
@@ -891,11 +957,12 @@ export default function Onboarding({ lang = 'nl', isDesktop = false, theme = 'li
               openOnly={openOnly} setOpenOnly={setOpenOnly}
               onNext={() => setStep(2)}
               onSkip={handleSkip}
+              onHome={onBack}
             />
           ) : (
             <DesktopStep2
               c={c} radius={radius} setRadius={setRadius}
-              onDone={handleLocationDone} onBack={() => setStep(1)} theme={theme}
+              onDone={handleLocationDone} onBack={() => setStep(1)} onHome={onBack} theme={theme}
             />
           )}
         </div>
@@ -912,6 +979,7 @@ export default function Onboarding({ lang = 'nl', isDesktop = false, theme = 'li
         openOnly={openOnly} setOpenOnly={setOpenOnly}
         onNext={() => setStep(2)}
         onSkip={handleSkip}
+        onHome={onBack}
       />
     )
   }
@@ -919,7 +987,7 @@ export default function Onboarding({ lang = 'nl', isDesktop = false, theme = 'li
   return (
     <Step2
       c={c} radius={radius} setRadius={setRadius}
-      onDone={handleLocationDone} onBack={() => setStep(1)} theme={theme}
+      onDone={handleLocationDone} onBack={() => setStep(1)} onHome={onBack} theme={theme}
     />
   )
 }

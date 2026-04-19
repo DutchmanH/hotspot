@@ -1114,7 +1114,7 @@ function MobileLanding({
             padding:
               "28px 24px calc(28px + env(safe-area-inset-bottom, 0px))",
             background:
-              "linear-gradient(to top, var(--bg) 78%, color-mix(in oklch, var(--bg) 35%, transparent) 100%)",
+              "linear-gradient(to top, var(--bg) 78%, color-mix(in oklch, var(--bg) 0%, transparent) 100%)",
             pointerEvents: "auto",
           }}
         >

@@ -55,6 +55,10 @@ export const COPY = {
     contact: "Contact",
     noResults: "Geen plekken gevonden. Pas je filters aan.",
     yourLocation: "Jouw locatie",
+    refreshBanner: "Plekken vernieuwen…",
+    filterHiddenBody: (n) =>
+      `${n} plekken zijn geladen maar vallen weg door je filters.`,
+    filterHiddenClear: "Filters wissen",
   },
   en: {
     panelTitle: "Tonight near you",
@@ -94,6 +98,10 @@ export const COPY = {
     contact: "Contact",
     noResults: "No places found. Adjust your filters.",
     yourLocation: "Your location",
+    refreshBanner: "Refreshing places…",
+    filterHiddenBody: (n) =>
+      `${n} places loaded but hidden by your filters.`,
+    filterHiddenClear: "Clear filters",
   },
 };
 
@@ -409,6 +417,50 @@ function CategoryBar({ lang, activeCats, onToggle }) {
   );
 }
 
+// ── Non-blocking refresh hint (map blijft zichtbaar) ───────────────────────
+function MapRefreshBanner({ lang, visible }) {
+  const t = COPY[lang];
+  if (!visible) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 12,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 35,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 16px",
+        borderRadius: "var(--r-pill)",
+        background: "var(--bg-elev)",
+        border: "1px solid var(--line-soft)",
+        boxShadow: "var(--shadow-pop)",
+        fontFamily: "var(--font-sans)",
+        fontSize: 13,
+        fontWeight: 500,
+        color: "var(--ink)",
+        pointerEvents: "none",
+        maxWidth: "min(92vw, 360px)",
+      }}
+    >
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          border: "2px solid color-mix(in oklab, var(--ink) 18%, transparent)",
+          borderTopColor: "var(--accent)",
+          flexShrink: 0,
+          animation: "spin .75s linear infinite",
+        }}
+      />
+      <span style={{ textAlign: "center", lineHeight: 1.25 }}>{t.refreshBanner}</span>
+    </div>
+  );
+}
+
 // ── Map recenter button ─────────────────────────────────────────────────────
 function MapControls({ lang, onRecenter, sheetH }) {
   return (
@@ -431,6 +483,47 @@ function MapControls({ lang, onRecenter, sheetH }) {
   );
 }
 
+function FilterEmptyHint({ lang, loadedCount, onClear }) {
+  const t = COPY[lang];
+  return (
+    <div
+      style={{
+        padding: "28px 20px 32px",
+        textAlign: "center",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <p
+        style={{
+          color: "var(--ink-soft)",
+          fontSize: 14,
+          lineHeight: 1.5,
+          margin: "0 0 16px",
+        }}
+      >
+        {t.filterHiddenBody(loadedCount)}
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        style={{
+          padding: "10px 18px",
+          borderRadius: "var(--r-pill)",
+          border: "1px solid var(--line)",
+          background: "var(--ink)",
+          color: "var(--bg)",
+          fontFamily: "var(--font-sans)",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        {t.filterHiddenClear}
+      </button>
+    </div>
+  );
+}
+
 // ── Bottom sheet (mobile) ───────────────────────────────────────────────────
 function BottomSheet({
   lang,
@@ -441,6 +534,9 @@ function BottomSheet({
   expanded,
   setExpanded,
   onHeight,
+  loadedPoiCount,
+  showFilterHint,
+  onClearFilters,
 }) {
   const t = COPY[lang];
   const collapsedH = 72;
@@ -523,8 +619,16 @@ function BottomSheet({
               </span>
               <span>
                 <b style={{ color: "var(--ink)", fontWeight: 600 }}>
-                  {pois.length}
-                </b>{" "}
+                  {showFilterHint ? 0 : pois.length}
+                </b>
+                {showFilterHint ? (
+                  <>
+                    {" "}
+                    <span style={{ color: "var(--ink-faint)" }}>/ {loadedPoiCount}</span>{" "}
+                  </>
+                ) : (
+                  " "
+                )}
                 {t.panelSub.split("·")[0].trim()}
               </span>
             </div>
@@ -577,7 +681,9 @@ function BottomSheet({
                     textTransform: "uppercase",
                   }}
                 >
-                  {pois.length} {t.panelSub.split("·")[1]?.trim() || "locaties"}
+                  {showFilterHint
+                    ? `0 / ${loadedPoiCount} ${t.panelSub.split("·")[1]?.trim() || "locaties"}`
+                    : `${pois.length} ${t.panelSub.split("·")[1]?.trim() || "locaties"}`}
                 </div>
               </div>
               <span
@@ -611,17 +717,25 @@ function BottomSheet({
         }}
       >
         {pois.length === 0 ? (
-          <p
-            style={{
-              padding: "32px 20px",
-              textAlign: "center",
-              fontFamily: "var(--font-sans)",
-              color: "var(--ink-faint)",
-              fontSize: 14,
-            }}
-          >
-            {t.noResults}
-          </p>
+          showFilterHint ? (
+            <FilterEmptyHint
+              lang={lang}
+              loadedCount={loadedPoiCount}
+              onClear={onClearFilters}
+            />
+          ) : (
+            <p
+              style={{
+                padding: "32px 20px",
+                textAlign: "center",
+                fontFamily: "var(--font-sans)",
+                color: "var(--ink-faint)",
+                fontSize: 14,
+              }}
+            >
+              {t.noResults}
+            </p>
+          )
         ) : (
           pois.map((poi, i) => (
             <PlaceRow
@@ -874,6 +988,10 @@ function DesktopApp({
   manualMode,
   onLocationSet,
   pinDropCycle,
+  loadedPoiCount,
+  showFilterHint,
+  onClearFilters,
+  refreshing,
 }) {
   const t = COPY[lang];
 
@@ -1284,22 +1402,32 @@ function DesktopApp({
                 marginLeft: "auto",
               }}
             >
-              {pois.length} {lang === "nl" ? "plekken" : "places"}
+              {showFilterHint
+                ? `0 / ${loadedPoiCount} ${lang === "nl" ? "plekken" : "places"}`
+                : `${pois.length} ${lang === "nl" ? "plekken" : "places"}`}
             </div>
           </div>
           <div style={{ overflow: "auto", flex: 1 }}>
             {pois.length === 0 ? (
-              <p
-                style={{
-                  padding: "32px 20px",
-                  textAlign: "center",
-                  fontFamily: "var(--font-sans)",
-                  color: "var(--ink-faint)",
-                  fontSize: 14,
-                }}
-              >
-                {t.noResults}
-              </p>
+              showFilterHint ? (
+                <FilterEmptyHint
+                  lang={lang}
+                  loadedCount={loadedPoiCount}
+                  onClear={onClearFilters}
+                />
+              ) : (
+                <p
+                  style={{
+                    padding: "32px 20px",
+                    textAlign: "center",
+                    fontFamily: "var(--font-sans)",
+                    color: "var(--ink-faint)",
+                    fontSize: 14,
+                  }}
+                >
+                  {t.noResults}
+                </p>
+              )
             ) : (
               pois.map((poi, i) => (
                 <div
@@ -1330,6 +1458,7 @@ function DesktopApp({
 
         {/* Right: map */}
         <div style={{ position: "relative", overflow: "hidden" }}>
+          <MapRefreshBanner lang={lang} visible={refreshing} />
           <Map
             pois={pois}
             onBoundsChange={() => {}}
@@ -1678,75 +1807,6 @@ function useIsDesktop(breakpoint = 900) {
   return isDesktop;
 }
 
-function SearchLoadingOverlay({ lang = "nl" }) {
-  const title = lang === "nl" ? "Hotspots zoeken..." : "Finding hotspots...";
-  const sub =
-    lang === "nl"
-      ? "We zoeken de leukste plekken in jouw buurt."
-      : "We are looking for the best nearby spots.";
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 300,
-        background: "rgba(10, 10, 10, 0.35)",
-        backdropFilter: "blur(2px)",
-        display: "grid",
-        placeItems: "center",
-      }}
-    >
-      <div
-        style={{
-          minWidth: 250,
-          maxWidth: 320,
-          borderRadius: "var(--r-lg)",
-          background: "var(--bg-elev)",
-          border: "1px solid var(--line-soft)",
-          boxShadow: "var(--shadow-pop)",
-          padding: "18px 18px 16px",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 34,
-            height: 34,
-            margin: "0 auto 12px",
-            borderRadius: "50%",
-            border: "3px solid color-mix(in oklab, var(--ink) 20%, transparent)",
-            borderTopColor: "var(--accent)",
-            animation: "spin .8s linear infinite",
-          }}
-        />
-        <div
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontSize: 15,
-            fontWeight: 600,
-            color: "var(--ink)",
-            lineHeight: 1.2,
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{
-            marginTop: 6,
-            fontFamily: "var(--font-sans)",
-            fontSize: 12,
-            color: "var(--ink-soft)",
-            lineHeight: 1.45,
-          }}
-        >
-          {sub}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Kaart component ────────────────────────────────────────────────────
 export default function Kaart() {
   const { theme, toggleTheme } = useTheme();
@@ -1804,6 +1864,17 @@ export default function Kaart() {
 
   const mapRef = useRef(null);
   const requestSeqRef = useRef(0);
+  const poiFetchAbortRef = useRef(null);
+
+  const clearVisibilityFilters = useCallback(() => {
+    setActiveCats([]);
+    setFilters({
+      radius: 99999,
+      price: "any",
+      openOnly: false,
+      minRating: 0,
+    });
+  }, []);
 
   useEffect(() => {
     initSession();
@@ -1836,11 +1907,15 @@ export default function Kaart() {
 
   const loadPOIs = async (lat, lng, r) => {
     const reqId = ++requestSeqRef.current;
+    poiFetchAbortRef.current?.abort();
+    const ac = new AbortController();
+    poiFetchAbortRef.current = ac;
+
     setLastSearch({ lat, lng, r });
     setLoadError(null);
     setLoading(true);
     try {
-      const raw = await fetchAllPOIs(lat, lng, r / 1000);
+      const raw = await fetchAllPOIs(lat, lng, r / 1000, ac.signal);
       if (reqId !== requestSeqRef.current) return;
 
       if (!raw?.length) {
@@ -1860,13 +1935,15 @@ export default function Kaart() {
       setAllPois(enriched);
     } catch (err) {
       if (reqId !== requestSeqRef.current) return;
+      if (err?.name === "AbortError") return;
       setAllPois([]);
       const code = err?.code === "rateLimited" || err?.code === "timeout" ? err.code : "general";
       setLoadError({ code });
     } finally {
-      if (reqId !== requestSeqRef.current) return;
-      setLoading(false);
-      setPinDropCycle((c) => c + 1);
+      if (reqId === requestSeqRef.current) {
+        setLoading(false);
+        setPinDropCycle((c) => c + 1);
+      }
     }
   };
 
@@ -1955,6 +2032,10 @@ export default function Kaart() {
     return n;
   }, [filters]);
 
+  const filterHint = allPois.length > 0 && filteredPois.length === 0;
+  const showBlockingOverlay = loadError != null || (loading && allPois.length === 0);
+  const showRefreshBanner = loading && allPois.length > 0;
+
   // ── Render landing ────────────────────────────────────────────────────────
   if (stage === "landing") {
     return (
@@ -2039,6 +2120,10 @@ export default function Kaart() {
           manualMode={manualMode}
           onLocationSet={handleManualPin}
           pinDropCycle={pinDropCycle}
+          loadedPoiCount={allPois.length}
+          showFilterHint={filterHint}
+          onClearFilters={clearVisibilityFilters}
+          refreshing={showRefreshBanner}
         />
       ) : (
         <div
@@ -2050,6 +2135,7 @@ export default function Kaart() {
             background: "var(--bg)",
           }}
         >
+          <MapRefreshBanner lang={lang} visible={showRefreshBanner} />
           <Map
             pois={filteredPois}
             onBoundsChange={() => {}}
@@ -2100,6 +2186,9 @@ export default function Kaart() {
             expanded={sheetExpanded}
             setExpanded={setSheetExpanded}
             onHeight={setSheetH}
+            loadedPoiCount={allPois.length}
+            showFilterHint={filterHint}
+            onClearFilters={clearVisibilityFilters}
           />
 
           {selected && (
@@ -2158,7 +2247,7 @@ export default function Kaart() {
         </div>
       )}
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      {(loading || loadError) && (
+      {showBlockingOverlay && (
         <LoadingOverlay
           error={loadError}
           onRetry={loadError ? retryLoad : null}

@@ -21,8 +21,39 @@ const RETRY_DELAYS = [3000, 6000]
 // Wachttijd bij rate-limit (ms) — Overpass vraagt min. 1 minuut wachten
 const RATE_LIMIT_DELAY = 65000
 
-// Module-level abort controller — annuleert vorige request bij nieuwe call
-let _abortCtrl = null
+/** Client-side cache: parsed POI-rijen (zonder _dist), per afgeronde locatie + straal */
+const POI_CACHE = new Map()
+const CACHE_TTL_MS = 5 * 60 * 1000
+const CACHE_MAX_ENTRIES = 24
+
+function poiCacheKey(lat, lng, radiusKm) {
+  return `${lat.toFixed(4)},${lng.toFixed(4)},${radiusKm}`
+}
+
+function readPoiCache(lat, lng, radiusKm) {
+  const key = poiCacheKey(lat, lng, radiusKm)
+  const row = POI_CACHE.get(key)
+  if (!row) return null
+  if (Date.now() - row.at > CACHE_TTL_MS) {
+    POI_CACHE.delete(key)
+    return null
+  }
+  POI_CACHE.delete(key)
+  POI_CACHE.set(key, row)
+  return row.pois
+}
+
+function writePoiCache(lat, lng, radiusKm, pois) {
+  if (!pois?.length) return
+  const key = poiCacheKey(lat, lng, radiusKm)
+  if (POI_CACHE.has(key)) POI_CACHE.delete(key)
+  POI_CACHE.set(key, { at: Date.now(), pois })
+  while (POI_CACHE.size > CACHE_MAX_ENTRIES) {
+    const oldest = POI_CACHE.keys().next().value
+    if (oldest === undefined) break
+    POI_CACHE.delete(oldest)
+  }
+}
 
 async function fetchOverpass(query, attempt = 0, parentSignal = null) {
   const overpassTimeout = ATTEMPT_TIMEOUTS[attempt]
@@ -256,11 +287,30 @@ export async function fetchPOIs(category, bounds) {
   return parseElements(data.elements, category)
 }
 
-export async function fetchAllPOIs(lat, lng, radiusKm) {
-  // Annuleer eventuele lopende request
-  if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null }
-  _abortCtrl = new AbortController()
-  const signal = _abortCtrl.signal
+/**
+ * @param {number} lat
+ * @param {number} lng
+ * @param {number} radiusKm
+ * @param {AbortSignal} signal — verplicht; annuleer vorige call vanuit de aanroeper
+ */
+export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
+  if (!signal) {
+    throw new Error('fetchAllPOIs requires an AbortSignal')
+  }
+  if (signal.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
+
+  const cached = readPoiCache(lat, lng, radiusKm)
+  if (cached) {
+    if (signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
+    return cached.map((p) => ({
+      ...p,
+      tags: { ...p.tags },
+    }))
+  }
 
   const bbox = boundsFromRadius(lat, lng, radiusKm)
   const inner = Object.entries(CATEGORY_QUERIES)
@@ -268,34 +318,32 @@ export async function fetchAllPOIs(lat, lng, radiusKm) {
     .join('')
   const query = `[out:json][timeout:45];(${inner});out center 200;`
 
-  try {
-    const data = await fetchOverpass(query, 0, signal)
-    _abortCtrl = null
+  const data = await fetchOverpass(query, 0, signal)
 
-    return data.elements
-      .filter(el => el.lat || el.center)
-      .map(el => {
-        const tags = el.tags || {}
-        let category = 'activities'
-        if (tags.amenity && ['restaurant', 'cafe', 'bar', 'fast_food'].includes(tags.amenity)) category = 'food'
-        else if (tags.tourism && ['museum', 'gallery'].includes(tags.tourism)) category = 'culture'
-        else if (tags.amenity && ['theatre', 'cinema'].includes(tags.amenity)) category = 'culture'
-        else if (tags.historic) category = 'culture'
-        else if (tags.leisure && ['park', 'nature_reserve'].includes(tags.leisure)) category = 'outdoor'
-        else if (tags.tourism && ['viewpoint', 'picnic_site'].includes(tags.tourism)) category = 'outdoor'
-        return {
-          id: String(el.id),
-          lat: el.lat ?? el.center.lat,
-          lng: el.lon ?? el.center.lon,
-          name: getDisplayName(tags),
-          tags,
-          category,
-        }
-      })
-  } catch (err) {
-    _abortCtrl = null
-    // Annulering door een nieuwe request — stilzwijgend afbreken
-    if (err.name === 'AbortError') return []
-    throw err
-  }
+  const parsed = data.elements
+    .filter(el => el.lat || el.center)
+    .map(el => {
+      const tags = el.tags || {}
+      let category = 'activities'
+      if (tags.amenity && ['restaurant', 'cafe', 'bar', 'fast_food'].includes(tags.amenity)) category = 'food'
+      else if (tags.tourism && ['museum', 'gallery'].includes(tags.tourism)) category = 'culture'
+      else if (tags.amenity && ['theatre', 'cinema'].includes(tags.amenity)) category = 'culture'
+      else if (tags.historic) category = 'culture'
+      else if (tags.leisure && ['park', 'nature_reserve'].includes(tags.leisure)) category = 'outdoor'
+      else if (tags.tourism && ['viewpoint', 'picnic_site'].includes(tags.tourism)) category = 'outdoor'
+      return {
+        id: String(el.id),
+        lat: el.lat ?? el.center.lat,
+        lng: el.lon ?? el.center.lon,
+        name: getDisplayName(tags),
+        tags,
+        category,
+      }
+    })
+
+  writePoiCache(lat, lng, radiusKm, parsed)
+  return parsed.map((p) => ({
+    ...p,
+    tags: { ...p.tags },
+  }))
 }
