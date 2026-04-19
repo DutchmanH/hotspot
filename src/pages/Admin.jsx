@@ -62,6 +62,60 @@ function buildDailyUniqueSeries(sessions, days = 14) {
   return dayBuckets.map((d) => ({ ...d, count: uniqueByDay[d.key].size }))
 }
 
+function isMissingColumnPostgrestError(error) {
+  if (!error) return false
+  const code = String(error.code || '')
+  if (code === '42703' || code === 'PGRST204') return true
+
+  const msg = String(error.message || '').toLowerCase()
+  if (!msg.includes('column')) return false
+  return msg.includes('does not exist') || msg.includes('could not find')
+}
+
+async function loadProfilesUsersTable(supabaseClient) {
+  const tries = [
+    'id, display_name, role, email, created_at, updated_at',
+    'id, display_name, role, created_at, updated_at',
+    'id, display_name, email, created_at, updated_at',
+    'id, display_name, created_at, updated_at',
+    'id, display_name',
+  ]
+
+  let lastError = null
+
+  for (const sel of tries) {
+    const ordered = await supabaseClient
+      .from('profiles')
+      .select(sel)
+      .order('created_at', { ascending: false })
+      .limit(300)
+
+    if (!ordered.error) return { data: ordered.data || [], error: null }
+
+    lastError = ordered.error
+    if (!isMissingColumnPostgrestError(ordered.error)) {
+      return { data: [], error: ordered.error }
+    }
+
+    const unordered = await supabaseClient.from('profiles').select(sel).limit(300)
+    if (!unordered.error) {
+      const rows = [...(unordered.data || [])].sort((a, b) => {
+        const ta = a?.created_at ? new Date(a.created_at).getTime() : 0
+        const tb = b?.created_at ? new Date(b.created_at).getTime() : 0
+        return tb - ta
+      })
+      return { data: rows.slice(0, 300), error: null }
+    }
+
+    lastError = unordered.error
+    if (!isMissingColumnPostgrestError(unordered.error)) {
+      return { data: [], error: unordered.error }
+    }
+  }
+
+  return { data: [], error: lastError }
+}
+
 export default function Admin() {
   const { t } = useTranslation()
   const [session, setSession] = useState(null)
@@ -70,8 +124,24 @@ export default function Admin() {
   const [loginError, setLoginError] = useState('')
   const [stats, setStats] = useState(null)
   const [statsError, setStatsError] = useState(null)
+  const [users, setUsers] = useState([])
+  const [usersError, setUsersError] = useState(null)
+  const [usersLoading, setUsersLoading] = useState(false)
   const [sourceFilter, setSourceFilter] = useState('live') // 'all' | 'live' | 'dev'
   const [chartMode, setChartMode] = useState('sessions') // 'sessions' | 'users'
+
+  const formatDate = (iso) => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '—'
+    return d.toLocaleString('nl-NL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
 
   const loadStats = async (filter = sourceFilter) => {
     setStatsError(null)
@@ -132,10 +202,32 @@ export default function Admin() {
     }
   }
 
+  const loadUsers = async () => {
+    setUsersLoading(true)
+    setUsersError(null)
+    try {
+      const { data, error } = await loadProfilesUsersTable(supabase)
+      if (error) {
+        setUsersError(error.message)
+        setUsers([])
+        return
+      }
+      setUsers(data || [])
+    } catch (err) {
+      setUsersError(String(err))
+      setUsers([])
+    } finally {
+      setUsersLoading(false)
+    }
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      if (data.session) loadStats('live')
+      if (data.session) {
+        loadStats('live')
+        loadUsers()
+      }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -148,6 +240,7 @@ export default function Admin() {
     } else {
       setSession(data.session)
       loadStats('live')
+      loadUsers()
     }
   }
 
@@ -155,6 +248,7 @@ export default function Admin() {
     await supabase.auth.signOut()
     setSession(null)
     setStats(null)
+    setUsers([])
   }
 
   const handleSourceFilter = (f) => {
@@ -296,6 +390,55 @@ export default function Admin() {
                     )
                   })}
                 </div>
+              </div>
+              <div className="admin-users-card">
+                <div className="admin-users-head">
+                  <h3>{t('admin.users.title')}</h3>
+                  <button className="source-btn" onClick={loadUsers}>
+                    {t('admin.users.refresh')}
+                  </button>
+                </div>
+                {usersError && (
+                  <div className="admin-error">
+                    <strong>Fout bij laden:</strong> {usersError}
+                  </div>
+                )}
+                {usersLoading ? (
+                  <p className="admin-loading">{t('admin.users.loading')}</p>
+                ) : users.length === 0 ? (
+                  <p className="admin-empty">{t('admin.users.empty')}</p>
+                ) : (
+                  <div className="admin-users-table-wrap">
+                    <table className="admin-users-table">
+                      <thead>
+                        <tr>
+                          <th>{t('admin.users.name')}</th>
+                          <th>{t('admin.users.role')}</th>
+                          <th>{t('admin.users.identifier')}</th>
+                          <th>{t('admin.users.created')}</th>
+                          <th>{t('admin.users.updated')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.map((u) => (
+                          <tr key={u.id}>
+                            <td>{u.display_name || '—'}</td>
+                            <td>{u.role || '—'}</td>
+                            <td>
+                              {u.email
+                                ? u.email
+                                : u.id
+                                  ? `${String(u.id).slice(0, 8)}…`
+                                  : '—'}
+                            </td>
+                            <td>{formatDate(u.created_at)}</td>
+                            <td>{formatDate(u.updated_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </>
           ) : null}

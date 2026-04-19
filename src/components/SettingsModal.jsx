@@ -73,8 +73,9 @@ function SegmentedControl({ options, value, onChange }) {
   )
 }
 
-function Body({ lang, setLang, theme, setTheme, onClose, onOpenAdmin, embedded }) {
+function Body({ lang, setLang, theme, setTheme, onClose, onOpenAdmin, adminLabel, user, embedded }) {
   const c = COPY[lang] || COPY.nl
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || ''
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -83,7 +84,14 @@ function Body({ lang, setLang, theme, setTheme, onClose, onOpenAdmin, embedded }
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '20px 24px 16px', borderBottom: '1px solid var(--line-soft)',
       }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontStyle: 'italic' }}>{c.title}</h2>
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontStyle: 'italic' }}>{c.title}</h2>
+          {displayName && (
+            <p style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'var(--font-sans)' }}>
+              {lang === 'nl' ? `Hoi ${displayName}` : `Hi ${displayName}`}
+            </p>
+          )}
+        </div>
         <button onClick={onClose} style={{
           width: 32, height: 32, borderRadius: '50%',
           background: 'var(--bg)', border: '1px solid var(--line-soft)',
@@ -141,7 +149,7 @@ function Body({ lang, setLang, theme, setTheme, onClose, onOpenAdmin, embedded }
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
             </svg>
-            {c.admin}
+            {adminLabel || c.admin}
           </button>
         )}
       </div>

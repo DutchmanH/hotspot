@@ -70,6 +70,18 @@
     "email": "Email address",
     "password": "Password",
     "logout": "Log out",
+    "users": {
+      "title": "Users",
+      "refresh": "Refresh",
+      "loading": "Loading users...",
+      "empty": "No users found yet.",
+      "name": "Name",
+      "role": "Role",
+      "identifier": "Email / ID",
+      "email": "Email",
+      "created": "Created",
+      "updated": "Last updated"
+    },
     "stats": {
       "totalSessions": "Total sessions",
       "uniqueUsers": "Unique users",

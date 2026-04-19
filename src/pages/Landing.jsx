@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import SettingsModal from "../components/SettingsModal";
+import AuthModal from "../components/AuthModal";
+import { useAuth } from "../context/AuthContext";
 
 /* ─── Translations ──────────────────────────────────────────── */
 const COPY = {
@@ -290,6 +294,25 @@ function MoonIcon() {
     </svg>
   );
 }
+
+function MenuIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
 function ArrowRightIcon() {
   return (
     <svg
@@ -520,7 +543,7 @@ function GroningenMap({
 }
 
 /* ─── Mobile landing ─────────────────────────────────────────── */
-function MobileLanding({ c, lang, setLang, theme, setTheme, onStart }) {
+function MobileLanding({ c, lang, theme, onStart, onOpenSettings }) {
   return (
     <div
       style={{
@@ -561,19 +584,8 @@ function MobileLanding({ c, lang, setLang, theme, setTheme, onStart }) {
           </span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setLang(lang === "nl" ? "en" : "nl")}
-            style={btnStyle}
-            title="Language"
-          >
-            {lang === "nl" ? "EN" : "NL"}
-          </button>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            style={btnStyle}
-            title="Theme"
-          >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          <button onClick={onOpenSettings} style={btnStyle} title="Menu">
+            <MenuIcon />
           </button>
         </div>
       </div>
@@ -714,7 +726,7 @@ function MobileLanding({ c, lang, setLang, theme, setTheme, onStart }) {
 }
 
 /* ─── Desktop landing ────────────────────────────────────────── */
-function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
+function DesktopLanding({ c, theme, onStart, onOpenAuth, onOpenAccount, user, accountLinkLabel }) {
   const [openFaq, setOpenFaq] = useState(null);
 
   return (
@@ -726,11 +738,41 @@ function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
         overflowX: "hidden",
       }}
     >
+      <div
+        style={{
+          height: 34,
+          borderBottom: "1px solid var(--line-soft)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          padding: "0 48px",
+          background: "var(--bg)",
+        }}
+      >
+        <button
+          onClick={user ? onOpenAccount : onOpenAuth}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: "var(--ink-soft)",
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+            padding: 0,
+          }}
+        >
+          {accountLinkLabel}
+        </button>
+      </div>
+
       {/* ── Nav ── */}
       <nav
         style={{
           position: "sticky",
-          top: 0,
+          top: 34,
           zIndex: 50,
           height: 64,
           background: "color-mix(in oklch, var(--bg) 85%, transparent)",
@@ -774,18 +816,6 @@ function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
             </a>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={() => setLang(lang === "nl" ? "en" : "nl")}
-              style={btnStyle}
-            >
-              {lang === "nl" ? "EN" : "NL"}
-            </button>
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              style={btnStyle}
-            >
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            </button>
             <button onClick={onStart} style={ctaStyle}>
               {c.cta} <ArrowRightIcon />
             </button>
@@ -1140,7 +1170,7 @@ function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
       {/* ── FAQ ── */}
       <section id="faq" style={{ padding: "96px 48px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <SectionHead title={c.faq_title} />
+          <SectionHead title={c.faq_title} sub="" />
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {c.faq.map((item, i) => (
               <div
@@ -1355,24 +1385,73 @@ export default function Landing({
   isDesktop,
   onStart,
 }) {
+  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const c = COPY[lang] || COPY.nl;
-  return isDesktop ? (
-    <DesktopLanding
-      c={c}
-      lang={lang}
-      setLang={setLang}
-      theme={theme}
-      setTheme={setTheme}
-      onStart={onStart}
-    />
-  ) : (
-    <MobileLanding
-      c={c}
-      lang={lang}
-      setLang={setLang}
-      theme={theme}
-      setTheme={setTheme}
-      onStart={onStart}
-    />
+
+  const openAccountHome = useCallback(() => {
+    if (user && isAdmin) {
+      navigate("/admin");
+      return;
+    }
+    navigate("/account");
+  }, [isAdmin, navigate, user]);
+
+  const accountMenuLabel = useMemo(() => {
+    if (!user) return lang === "nl" ? "Inloggen" : "Login";
+    if (isAdmin) return "Dashboard";
+    return lang === "nl" ? "Account" : "Account";
+  }, [isAdmin, lang, user]);
+
+  const desktopAccountLinkLabel = useMemo(() => {
+    if (!user) return "Inloggen";
+    if (isAdmin) return "Dashboard";
+    return "Account";
+  }, [isAdmin, user]);
+
+  return (
+    <>
+      {isDesktop ? (
+        <DesktopLanding
+          c={c}
+          theme={theme}
+          onStart={onStart}
+          user={user}
+          onOpenAuth={() => setShowAuthModal(true)}
+          onOpenAccount={openAccountHome}
+          accountLinkLabel={desktopAccountLinkLabel}
+        />
+      ) : (
+        <MobileLanding
+          c={c}
+          lang={lang}
+          theme={theme}
+          onStart={onStart}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+      )}
+      {showSettings && (
+        <SettingsModal
+          lang={lang}
+          setLang={setLang}
+          theme={theme}
+          setTheme={setTheme}
+          user={user}
+          onClose={() => setShowSettings(false)}
+          onOpenAdmin={() => {
+            setShowSettings(false);
+            if (user) {
+              openAccountHome();
+              return;
+            }
+            setShowAuthModal(true);
+          }}
+          adminLabel={accountMenuLabel}
+        />
+      )}
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    </>
   );
 }

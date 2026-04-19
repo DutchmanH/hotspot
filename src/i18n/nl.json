@@ -70,6 +70,18 @@
     "email": "E-mailadres",
     "password": "Wachtwoord",
     "logout": "Uitloggen",
+    "users": {
+      "title": "Gebruikers",
+      "refresh": "Vernieuwen",
+      "loading": "Gebruikers laden...",
+      "empty": "Nog geen gebruikers gevonden.",
+      "name": "Naam",
+      "role": "Rol",
+      "identifier": "E-mail / ID",
+      "email": "E-mail",
+      "created": "Aangemaakt",
+      "updated": "Laatst bijgewerkt"
+    },
     "stats": {
       "totalSessions": "Totaal sessies",
       "uniqueUsers": "Unieke gebruikers",

@@ -8,10 +8,12 @@ import POIDetailModal from "../components/POIDetailModal";
 import FavoritesPanel from "../components/FavoritesPanel";
 import SettingsModal from "../components/SettingsModal";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AuthModal from "../components/AuthModal";
 import { useFavorites } from "../hooks/useFavorites";
 import { useTheme } from "../hooks/useTheme";
 import { fetchAllPOIs } from "../lib/overpass";
 import { initSession } from "../lib/session";
+import { useAuth } from "../context/AuthContext";
 
 // ── Translations (inline, same pattern as design) ──────────────────────────
 export const COPY = {
@@ -127,8 +129,8 @@ export function IconBtn({
   onClick,
   children,
   ariaLabel,
-  active,
-  badge,
+  active = false,
+  badge = 0,
   style = {},
 }) {
   return (
@@ -510,12 +512,15 @@ function BottomSheet({
                 color: "var(--ink-soft)",
               }}
             >
-              <ChevUpIcon
+              <span
                 style={{
                   transform: "rotate(180deg)",
                   color: "var(--ink-soft)",
+                  display: "inline-flex",
                 }}
-              />
+              >
+                <ChevUpIcon />
+              </span>
               <span>
                 <b style={{ color: "var(--ink)", fontWeight: 600 }}>
                   {pois.length}
@@ -860,6 +865,11 @@ function DesktopApp({
   activeFilterCount,
   onHome,
   onRecenter,
+  user,
+  isAdmin,
+  onOpenAuth,
+  onOpenAccount,
+  accountMenuLabel,
   mapRef,
   manualMode,
   onLocationSet,
@@ -1102,6 +1112,7 @@ function DesktopApp({
           <MenuIcon size={14} />
           <span>{lang === "nl" ? "Menu" : "Menu"}</span>
         </button>
+
       </div>
 
       {/* Active filter strip */}
@@ -1403,11 +1414,17 @@ function DesktopApp({
             setLang={setLang}
             theme={theme}
             setTheme={setTheme}
+            user={user}
             onClose={() => setShowSettings(false)}
             onOpenAdmin={() => {
               setShowSettings(false);
-              window.location.href = "/admin";
+              if (user) {
+                onOpenAccount();
+                return;
+              }
+              onOpenAuth();
             }}
+            adminLabel={accountMenuLabel}
             embedded
           />
         </DtModal>
@@ -1552,7 +1569,7 @@ function MenuIcon({ size = 18 }) {
     </svg>
   );
 }
-function LocateIcon({ size = 18 }) {
+function LocateIcon({ size = 18 } = {}) {
   return (
     <svg
       width={size}
@@ -1733,6 +1750,7 @@ function SearchLoadingOverlay({ lang = "nl" }) {
 // ── Main Kaart component ────────────────────────────────────────────────────
 export default function Kaart() {
   const { theme, toggleTheme } = useTheme();
+  const { user, isAdmin } = useAuth();
   const [themeState, setThemeState] = useState(theme);
   const { addFavorite, removeFavorite, isFavorite } = useFavorites();
   const isDesktop = useIsDesktop();
@@ -1741,6 +1759,20 @@ export default function Kaart() {
   // Stage: landing → onboarding → app
   const [stage, setStage] = useState("landing");
   const [lang, setLang] = useState("nl");
+
+  const openAccountHome = useCallback(() => {
+    if (user && isAdmin) {
+      navigate("/admin");
+      return;
+    }
+    navigate("/account");
+  }, [isAdmin, navigate, user]);
+
+  const accountMenuLabel = useMemo(() => {
+    if (!user) return lang === "nl" ? "Inloggen" : "Login";
+    if (isAdmin) return "Dashboard";
+    return lang === "nl" ? "Account" : "Account";
+  }, [isAdmin, lang, user]);
 
   // Location + data
   const [userLocation, setUserLocation] = useState(null);
@@ -1765,6 +1797,7 @@ export default function Kaart() {
   const [showFilters, setShowFilters] = useState(false);
   const [showFavs, setShowFavs] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [pinDropCycle, setPinDropCycle] = useState(0);
   const [lastSearch, setLastSearch] = useState(null);
@@ -1775,6 +1808,24 @@ export default function Kaart() {
   useEffect(() => {
     initSession();
   }, []);
+
+  useEffect(() => {
+    if (isDesktop) return undefined;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyOverscroll = document.body.style.overscrollBehavior;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehavior = prevBodyOverscroll;
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, [isDesktop]);
 
   // Sync theme state with hook
   const setTheme = (t) => {
@@ -1909,7 +1960,13 @@ export default function Kaart() {
     return (
       <div
         data-theme={themeState}
-        style={{ height: "100vh", overflow: isDesktop ? "auto" : "hidden" }}
+        style={{
+          height: "100vh",
+          overflow: isDesktop ? "auto" : "hidden",
+          position: isDesktop ? "relative" : "fixed",
+          inset: isDesktop ? "auto" : 0,
+          width: "100%",
+        }}
       >
         <Landing
           lang={lang}
@@ -1973,6 +2030,11 @@ export default function Kaart() {
           activeFilterCount={activeFilterCount}
           onHome={() => setStage("landing")}
           onRecenter={recenter}
+          user={user}
+          isAdmin={isAdmin}
+          onOpenAuth={() => setShowAuthModal(true)}
+          onOpenAccount={openAccountHome}
+          accountMenuLabel={accountMenuLabel}
           mapRef={mapRef}
           manualMode={manualMode}
           onLocationSet={handleManualPin}
@@ -2080,15 +2142,22 @@ export default function Kaart() {
               setLang={setLang}
               theme={themeState}
               setTheme={setTheme}
+              user={user}
               onClose={() => setShowSettings(false)}
               onOpenAdmin={() => {
                 setShowSettings(false);
-                navigate("/admin");
+                if (user) {
+                  openAccountHome();
+                  return;
+                }
+                setShowAuthModal(true);
               }}
+              adminLabel={accountMenuLabel}
             />
           )}
         </div>
       )}
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       {(loading || loadError) && (
         <LoadingOverlay
           error={loadError}
@@ -2098,3 +2167,4 @@ export default function Kaart() {
     </div>
   );
 }
+
