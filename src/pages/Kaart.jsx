@@ -7,6 +7,7 @@ import FilterModal from "../components/FilterModal";
 import POIDetailModal from "../components/POIDetailModal";
 import FavoritesPanel from "../components/FavoritesPanel";
 import SettingsModal from "../components/SettingsModal";
+import LoadingOverlay from "../components/LoadingOverlay";
 import { useFavorites } from "../hooks/useFavorites";
 import { useTheme } from "../hooks/useTheme";
 import { fetchAllPOIs } from "../lib/overpass";
@@ -862,6 +863,7 @@ function DesktopApp({
   mapRef,
   manualMode,
   onLocationSet,
+  pinDropCycle,
 }) {
   const t = COPY[lang];
 
@@ -1327,6 +1329,8 @@ function DesktopApp({
             manualMode={manualMode}
             onLocationSet={onLocationSet}
             theme={theme}
+            selectedId={selected?.id}
+            pinDropCycle={pinDropCycle}
           />
           {/* Recenter + zoom */}
           <div
@@ -1657,6 +1661,75 @@ function useIsDesktop(breakpoint = 900) {
   return isDesktop;
 }
 
+function SearchLoadingOverlay({ lang = "nl" }) {
+  const title = lang === "nl" ? "Hotspots zoeken..." : "Finding hotspots...";
+  const sub =
+    lang === "nl"
+      ? "We zoeken de leukste plekken in jouw buurt."
+      : "We are looking for the best nearby spots.";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 300,
+        background: "rgba(10, 10, 10, 0.35)",
+        backdropFilter: "blur(2px)",
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <div
+        style={{
+          minWidth: 250,
+          maxWidth: 320,
+          borderRadius: "var(--r-lg)",
+          background: "var(--bg-elev)",
+          border: "1px solid var(--line-soft)",
+          boxShadow: "var(--shadow-pop)",
+          padding: "18px 18px 16px",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            margin: "0 auto 12px",
+            borderRadius: "50%",
+            border: "3px solid color-mix(in oklab, var(--ink) 20%, transparent)",
+            borderTopColor: "var(--accent)",
+            animation: "spin .8s linear infinite",
+          }}
+        />
+        <div
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: 15,
+            fontWeight: 600,
+            color: "var(--ink)",
+            lineHeight: 1.2,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            marginTop: 6,
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            color: "var(--ink-soft)",
+            lineHeight: 1.45,
+          }}
+        >
+          {sub}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Kaart component ────────────────────────────────────────────────────
 export default function Kaart() {
   const { theme, toggleTheme } = useTheme();
@@ -1674,6 +1747,7 @@ export default function Kaart() {
   const [radius, setRadius] = useState(2000);
   const [allPois, setAllPois] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   // Filters
   const [activeCats, setActiveCats] = useState([]);
@@ -1692,8 +1766,11 @@ export default function Kaart() {
   const [showFavs, setShowFavs] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [manualMode, setManualMode] = useState(false);
+  const [pinDropCycle, setPinDropCycle] = useState(0);
+  const [lastSearch, setLastSearch] = useState(null);
 
   const mapRef = useRef(null);
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
     initSession();
@@ -1707,9 +1784,20 @@ export default function Kaart() {
   };
 
   const loadPOIs = async (lat, lng, r) => {
+    const reqId = ++requestSeqRef.current;
+    setLastSearch({ lat, lng, r });
+    setLoadError(null);
     setLoading(true);
     try {
       const raw = await fetchAllPOIs(lat, lng, r / 1000);
+      if (reqId !== requestSeqRef.current) return;
+
+      if (!raw?.length) {
+        setAllPois([]);
+        setLoadError({ code: "general" });
+        return;
+      }
+
       // Enrich with distance + open status
       const enriched = raw
         .map((p) => ({
@@ -1719,10 +1807,15 @@ export default function Kaart() {
         }))
         .sort((a, b) => a._dist - b._dist);
       setAllPois(enriched);
-    } catch {
+    } catch (err) {
+      if (reqId !== requestSeqRef.current) return;
       setAllPois([]);
+      const code = err?.code === "rateLimited" || err?.code === "timeout" ? err.code : "general";
+      setLoadError({ code });
     } finally {
+      if (reqId !== requestSeqRef.current) return;
       setLoading(false);
+      setPinDropCycle((c) => c + 1);
     }
   };
 
@@ -1775,6 +1868,16 @@ export default function Kaart() {
       mapRef.current?.flyTo([userLocation.lat, userLocation.lng], 15, {
         duration: 1,
       });
+    }
+  }
+
+  function retryLoad() {
+    if (lastSearch) {
+      loadPOIs(lastSearch.lat, lastSearch.lng, lastSearch.r);
+      return;
+    }
+    if (userLocation?.lat && userLocation?.lng) {
+      loadPOIs(userLocation.lat, userLocation.lng, radius);
     }
   }
 
@@ -1873,6 +1976,7 @@ export default function Kaart() {
           mapRef={mapRef}
           manualMode={manualMode}
           onLocationSet={handleManualPin}
+          pinDropCycle={pinDropCycle}
         />
       ) : (
         <div
@@ -1897,6 +2001,8 @@ export default function Kaart() {
             manualMode={manualMode}
             onLocationSet={handleManualPin}
             theme={themeState}
+            selectedId={selected?.id}
+            pinDropCycle={pinDropCycle}
           />
 
           <TopBar
@@ -1982,6 +2088,12 @@ export default function Kaart() {
             />
           )}
         </div>
+      )}
+      {(loading || loadError) && (
+        <LoadingOverlay
+          error={loadError}
+          onRetry={loadError ? retryLoad : null}
+        />
       )}
     </div>
   );

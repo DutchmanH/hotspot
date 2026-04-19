@@ -29,17 +29,12 @@ const COPY = {
   },
 }
 
-const CATS = ['food', 'outdoor', 'culture', 'activities']
-const CAT_HEX = {
-  food: '#d97050', outdoor: '#5a9e60', culture: '#9060c0', activities: '#c8a030',
-}
-
 const RADIUS_OPTIONS = [
   { label: '300m', value: 300 },
   { label: '800m', value: 800 },
   { label: '2 km', value: 2000 },
   { label: '5 km', value: 5000 },
-  { label: '∞',    value: 99999 },
+  { label: '10 km', value: 10000 },
 ]
 
 function CloseIcon() {
@@ -113,12 +108,11 @@ function Toggle({ label, value, onChange }) {
   )
 }
 
-function Body({ lang, filters, setFilters, activeCats, onToggleCat, onClose, embedded }) {
+function Body({ lang, filters, setFilters, onClose, embedded }) {
   const c = COPY[lang] || COPY.nl
 
   function resetAll() {
-    setFilters({ radius: 99999, price: 'any', openOnly: false, minRating: 0 })
-    onToggleCat('all')
+    setFilters({ radius: 10000, price: 'any', openOnly: false, minRating: 0 })
   }
 
   return (
@@ -142,40 +136,11 @@ function Body({ lang, filters, setFilters, activeCats, onToggleCat, onClose, emb
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
 
-        {/* Categories */}
-        <SectionLabel>{c.cats}</SectionLabel>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {CATS.map(id => {
-            const active = activeCats.includes(id)
-            const color = CAT_HEX[id]
-            return (
-              <button key={id} onClick={() => onToggleCat(id)} style={{
-                padding: '8px 14px', borderRadius: 'var(--r-pill)',
-                background: active
-                  ? `color-mix(in oklab, ${color} 18%, var(--bg-elev))`
-                  : 'var(--bg)',
-                color: active ? color : 'var(--ink-soft)',
-                border: `1.5px solid ${active ? color + 'aa' : 'var(--line)'}`,
-                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', transition: 'all .15s',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: color, opacity: active ? 1 : .4,
-                  display: 'inline-block',
-                }}/>
-                {c.cats_map[id]}
-              </button>
-            )
-          })}
-        </div>
-
         {/* Radius */}
         <SectionLabel>{c.radius}</SectionLabel>
         <PillRow
           options={RADIUS_OPTIONS}
-          value={filters.radius ?? 99999}
+          value={filters.radius ?? 10000}
           onChange={v => setFilters(f => ({ ...f, radius: v }))}
         />
 

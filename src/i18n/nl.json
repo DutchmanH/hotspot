@@ -72,8 +72,13 @@
     "logout": "Uitloggen",
     "stats": {
       "totalSessions": "Totaal sessies",
+      "uniqueUsers": "Unieke gebruikers",
       "weekSessions": "Sessies deze week",
-      "topCategories": "Populaire categorieën"
+      "topCategories": "Populaire categorieën",
+      "dailySessions": "Sessies per dag (laatste 14 dagen)",
+      "dailyUniqueUsers": "Unieke gebruikers per dag (laatste 14 dagen)",
+      "chartSessions": "Sessies",
+      "chartUsers": "Gebruikers"
     }
   },
   "theme": {

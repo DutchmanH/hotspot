@@ -171,28 +171,41 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
         </button>
 
         {/* Status pills */}
-        <div style={{ position: 'absolute', bottom: 12, left: 16, display: 'flex', gap: 6 }}>
-          {open === true && (
-            <span style={{
-              padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11,
-              background: 'oklch(0.70 0.16 145 / .22)', color: 'oklch(0.40 0.16 145)',
-              border: '1px solid oklch(0.70 0.16 145 / .3)', fontWeight: 500,
-              display: 'flex', alignItems: 'center', gap: 5,
-            }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.18 145)' }}/>
-              {c.openNow}
-            </span>
-          )}
-          {open === false && (
-            <span style={{ padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11, background: 'var(--bg)', color: 'var(--ink-faint)', border: '1px solid var(--line)' }}>
-              {c.closed}
-            </span>
-          )}
-          {isFree && (
-            <span style={{ padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11, background: 'var(--bg)', color: 'var(--ink-faint)', border: '1px solid var(--line)' }}>
-              {c.free}
-            </span>
-          )}
+        <div style={{
+          position: 'absolute',
+          bottom: 12,
+          left: 16,
+          right: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}>
+          <div>
+            {isFree && (
+              <span style={{ padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11, background: 'var(--bg)', color: 'var(--ink-faint)', border: '1px solid var(--line)' }}>
+                {c.free}
+              </span>
+            )}
+          </div>
+          <div>
+            {open !== false && (
+              <span style={{
+                padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11,
+                background: 'oklch(0.70 0.16 145 / .22)', color: 'oklch(0.40 0.16 145)',
+                border: '1px solid oklch(0.70 0.16 145 / .3)', fontWeight: 500,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.18 145)' }}/>
+                {c.openNow}
+              </span>
+            )}
+            {open === false && (
+              <span style={{ padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11, background: 'var(--bg)', color: 'var(--ink-faint)', border: '1px solid var(--line)' }}>
+                {c.closed}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

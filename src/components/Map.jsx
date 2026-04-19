@@ -14,7 +14,7 @@ const CAT_HEX = {
 
 /* ── Inline category icon paths (SVG strings for divIcon) ────── */
 function catIconPaths(cat) {
-  const s = 'rgba(255,255,255,0.95)'
+  const s = 'rgba(26,18,8,0.92)'
   const cx = 14, cy = 13
   if (cat === 'food') return (
     `<line x1="${cx-2.5}" y1="${cy-3.5}" x2="${cx-2.5}" y2="${cy+3.5}" stroke="${s}" stroke-width="1.5" stroke-linecap="round"/>` +
@@ -45,12 +45,12 @@ function catIconPaths(cat) {
 }
 
 /* ── Teardrop pin SVG ──────────────────────────────────────────── */
-function pinHtml(color, category, size = 'normal') {
+function pinHtml(color, category, size = 'normal', delayMs = 0) {
   const w = size === 'large' ? 28 : 22
   const h = size === 'large' ? 36 : 28
   const r = size === 'large' ? 5 : 4
   return `
-    <div style="position:relative;width:${w}px;height:${h + 4}px;animation:hs-drop .4s var(--ease,cubic-bezier(.2,.8,.2,1)) both;">
+    <div style="position:relative;width:${w}px;height:${h}px;animation:hs-pin-fall 1.05s cubic-bezier(.2,.8,.2,1) ${delayMs}ms both;">
       <svg width="${w}" height="${h}" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">
         <path d="M14 1C7.37 1 2 6.37 2 13c0 8 10.5 20 12 21.5 1.5-1.5 12-13.5 12-21.5C26 6.37 20.63 1 14 1z" fill="${color}"/>
         <circle cx="14" cy="13" r="${r + 3}" fill="rgba(255,255,255,0.9)"/>
@@ -59,13 +59,13 @@ function pinHtml(color, category, size = 'normal') {
     </div>`
 }
 
-function createCategoryIcon(category, selected = false) {
+function createCategoryIcon(category, selected = false, delayMs = 0) {
   const color = CAT_HEX[category] || '#888'
   return L.divIcon({
     className: '',
-    html: pinHtml(color, category, selected ? 'large' : 'normal'),
-    iconSize: selected ? [28, 40] : [22, 32],
-    iconAnchor: selected ? [14, 40] : [11, 32],
+    html: pinHtml(color, category, selected ? 'large' : 'normal', delayMs),
+    iconSize: selected ? [28, 36] : [22, 28],
+    iconAnchor: selected ? [14, 36] : [11, 28],
     popupAnchor: [0, -36],
   })
 }
@@ -162,6 +162,7 @@ export default function Map({
   onLocationSet,
   theme = 'light',
   selectedId,
+  pinDropCycle = 0,
 }) {
   return (
     <MapContainer
@@ -205,9 +206,13 @@ export default function Map({
       {/* POI pins */}
       {pois.map(poi => (
         <Marker
-          key={poi.id}
+          key={`${poi.id}-${pinDropCycle}`}
           position={[poi.lat, poi.lng]}
-          icon={createCategoryIcon(poi.category, poi.id === selectedId)}
+          icon={createCategoryIcon(
+            poi.category,
+            poi.id === selectedId,
+            Math.min(700, (Math.abs(String(poi.id).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 7) * 90),
+          )}
           eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
           zIndexOffset={poi.id === selectedId ? 500 : 0}
         />

@@ -4,6 +4,64 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, LogOut, Globe, Monitor } from 'lucide-react'
 
+function formatDayKey(date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function buildDailySeries(sessions, days = 14) {
+  const now = new Date()
+  const dayBuckets = []
+  const counts = {}
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const d = new Date(now)
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - i)
+    const key = formatDayKey(d)
+    counts[key] = 0
+    dayBuckets.push({
+      key,
+      label: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
+      count: 0,
+    })
+  }
+
+  sessions.forEach((s) => {
+    if (!s?.started_at) return
+    const key = formatDayKey(new Date(s.started_at))
+    if (key in counts) counts[key] += 1
+  })
+
+  return dayBuckets.map((d) => ({ ...d, count: counts[d.key] }))
+}
+
+function buildDailyUniqueSeries(sessions, days = 14) {
+  const now = new Date()
+  const dayBuckets = []
+  const uniqueByDay = {}
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const d = new Date(now)
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - i)
+    const key = formatDayKey(d)
+    uniqueByDay[key] = new Set()
+    dayBuckets.push({
+      key,
+      label: d.toLocaleDateString('nl-NL', { weekday: 'short' }).slice(0, 2),
+      count: 0,
+    })
+  }
+
+  sessions.forEach((s) => {
+    if (!s?.started_at || !s?.session_id) return
+    const key = formatDayKey(new Date(s.started_at))
+    if (uniqueByDay[key]) uniqueByDay[key].add(s.session_id)
+  })
+
+  return dayBuckets.map((d) => ({ ...d, count: uniqueByDay[d.key].size }))
+}
+
 export default function Admin() {
   const { t } = useTranslation()
   const [session, setSession] = useState(null)
@@ -13,6 +71,7 @@ export default function Admin() {
   const [stats, setStats] = useState(null)
   const [statsError, setStatsError] = useState(null)
   const [sourceFilter, setSourceFilter] = useState('live') // 'all' | 'live' | 'dev'
+  const [chartMode, setChartMode] = useState('sessions') // 'sessions' | 'users'
 
   const loadStats = async (filter = sourceFilter) => {
     setStatsError(null)
@@ -20,41 +79,54 @@ export default function Admin() {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
     try {
-      // Build base queries with optional source filter
-      let sessionsQuery = supabase.from('sessions').select('*', { count: 'exact', head: true })
-      let sessionsWeekQuery = supabase.from('sessions').select('*', { count: 'exact', head: true })
-        .gte('started_at', oneWeekAgo.toISOString())
-      let searchesQuery = supabase.from('searches').select('category')
-
-      if (filter === 'live') {
-        sessionsQuery = sessionsQuery.not('source', 'eq', 'localhost')
-        sessionsWeekQuery = sessionsWeekQuery.not('source', 'eq', 'localhost')
-        searchesQuery = searchesQuery.not('session_id', 'in',
-          `(select session_id from sessions where source = 'localhost')`
-        )
-      } else if (filter === 'dev') {
-        sessionsQuery = sessionsQuery.eq('source', 'localhost')
-        sessionsWeekQuery = sessionsWeekQuery.eq('source', 'localhost')
-      }
-
       const [
-        { count: total, error: e1 },
-        { count: week, error: e2 },
-        { data: cats, error: e3 },
-      ] = await Promise.all([sessionsQuery, sessionsWeekQuery, searchesQuery])
+        { data: sessionsData, error: e1 },
+        { data: searchesData, error: e2 },
+      ] = await Promise.all([
+        supabase
+          .from('sessions')
+          .select('session_id, started_at, source')
+          .order('started_at', { ascending: false })
+          .limit(5000),
+        supabase.from('searches').select('session_id, category').limit(10000),
+      ])
 
-      const err = e1 || e2 || e3
+      const err = e1 || e2
       if (err) { setStatsError(err.message); return }
 
+      const sessions = sessionsData || []
+      const searches = searchesData || []
+
+      const filteredSessions = sessions.filter((s) => {
+        if (filter === 'live') return s.source !== 'localhost'
+        if (filter === 'dev') return s.source === 'localhost'
+        return true
+      })
+
+      const sessionIds = new Set(filteredSessions.map((s) => s.session_id))
+      const uniqueUsers = sessionIds.size
+      const filteredSearches = searches.filter((s) => sessionIds.has(s.session_id))
+      const week = filteredSessions.filter((s) => new Date(s.started_at) >= oneWeekAgo).length
+
       const catCounts = {}
-      cats?.forEach(({ category }) => {
+      filteredSearches.forEach(({ category }) => {
         catCounts[category] = (catCounts[category] || 0) + 1
       })
       const topCats = Object.entries(catCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 4)
 
-      setStats({ total: total ?? 0, week: week ?? 0, topCats })
+      const dailySeries = buildDailySeries(filteredSessions, 14)
+      const dailyUniqueSeries = buildDailyUniqueSeries(filteredSessions, 14)
+
+      setStats({
+        total: filteredSessions.length,
+        uniqueUsers,
+        week: week ?? 0,
+        topCats,
+        dailySeries,
+        dailyUniqueSeries,
+      })
     } catch (err) {
       setStatsError(String(err))
     }
@@ -165,6 +237,10 @@ export default function Admin() {
                   <span className="stat-label">{t('admin.stats.totalSessions')}</span>
                 </div>
                 <div className="stat-card">
+                  <span className="stat-value">{stats.uniqueUsers}</span>
+                  <span className="stat-label">{t('admin.stats.uniqueUsers')}</span>
+                </div>
+                <div className="stat-card">
                   <span className="stat-value">{stats.week}</span>
                   <span className="stat-label">{t('admin.stats.weekSessions')}</span>
                 </div>
@@ -183,6 +259,43 @@ export default function Admin() {
                     ))}
                   </ul>
                 )}
+              </div>
+              <div className="daily-chart-card">
+                <div className="daily-chart-head">
+                  <h3>{chartMode === 'sessions' ? t('admin.stats.dailySessions') : t('admin.stats.dailyUniqueUsers')}</h3>
+                  <div className="admin-chart-toggle">
+                    <button
+                      className={`source-btn ${chartMode === 'sessions' ? 'active' : ''}`}
+                      onClick={() => setChartMode('sessions')}
+                    >
+                      {t('admin.stats.chartSessions')}
+                    </button>
+                    <button
+                      className={`source-btn ${chartMode === 'users' ? 'active' : ''}`}
+                      onClick={() => setChartMode('users')}
+                    >
+                      {t('admin.stats.chartUsers')}
+                    </button>
+                  </div>
+                </div>
+                <div className="daily-chart">
+                  {(chartMode === 'sessions' ? stats.dailySeries : stats.dailyUniqueSeries)?.map((day) => {
+                    const activeSeries = chartMode === 'sessions' ? stats.dailySeries : stats.dailyUniqueSeries
+                    const maxCount = Math.max(...activeSeries.map((d) => d.count), 1)
+                    return (
+                    <div key={day.key} className="daily-bar-wrap" title={`${day.key}: ${day.count}`}>
+                      <div
+                        className="daily-bar"
+                        style={{
+                          height: `${Math.max(6, (day.count / maxCount) * 100)}%`,
+                        }}
+                      />
+                      <span className="daily-bar-label">{day.label}</span>
+                      <span className="daily-bar-value">{day.count}</span>
+                    </div>
+                    )
+                  })}
+                </div>
               </div>
             </>
           ) : null}

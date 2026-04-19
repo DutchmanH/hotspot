@@ -24,8 +24,8 @@ const COPY = {
     gpsErr: 'Kan locatie niet ophalen. Probeer handmatig.',
     manualTitle: 'Kies een plek op de kaart',
     manualSub: 'Tik op de kaart om je startlocatie te kiezen.',
-    title2: 'Locatie geplaatst',
-    sub2: 'Kies hoe ver je wil zoeken.',
+    title2: 'Locatie ingesteld',
+    sub2: 'Top! We gebruiken deze pin als startpunt en zoeken straks binnen jouw gekozen bereik.',
     range: 'BEREIK',
     start: 'Starten',
     back: 'Terug',
@@ -49,8 +49,8 @@ const COPY = {
     gpsErr: 'Could not get location. Try manually.',
     manualTitle: 'Pick a spot on the map',
     manualSub: 'Tap the map to choose your starting point.',
-    title2: 'Pin placed',
-    sub2: 'Choose how far to look.',
+    title2: 'Location set',
+    sub2: 'Great! We will use this pin as your starting point and search within the selected range.',
     range: 'RANGE',
     start: 'Start',
     back: 'Back',
@@ -70,7 +70,7 @@ const RADIUS_OPTIONS = [
   { label: '800m', value: 800 },
   { label: '2 km', value: 2000 },
   { label: '5 km', value: 5000 },
-  { label: '∞',    value: 99999 },
+  { label: '10 km', value: 10000 },
 ]
 
 const GRONINGEN = { lat: 53.2194, lng: 6.5665 }
@@ -121,15 +121,16 @@ function MapClickHandler({ onPick }) {
 function GpsFlyer({ target }) {
   const map = useMap()
   useEffect(() => {
-    if (target) map.flyTo([target.lat, target.lng], 14, { duration: 1.2 })
-  }, [target]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!target) return
+    map.flyTo([target.lat, target.lng], 14, { duration: 1.0 })
+  }, [target?.lat, target?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
 function makePinIcon() {
   return L.divIcon({
     className: '',
-    html: `<div style="animation:hs-drop .35s cubic-bezier(.2,.8,.2,1) both;filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))">
+    html: `<div style="filter:drop-shadow(0 3px 8px rgba(0,0,0,.4));animation:hs-pop .2s ease-out;">
       <svg width="32" height="42" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
         <path d="M14 1C7.37 1 2 6.37 2 13c0 8 10.5 20 12 21.5 1.5-1.5 12-13.5 12-21.5C26 6.37 20.63 1 14 1z" fill="#1a1208"/>
         <circle cx="14" cy="13" r="5.5" fill="rgba(255,255,255,0.95)"/>
@@ -303,6 +304,12 @@ function Step1({ c, selectedCats, toggleCat, openOnly, setOpenOnly, onNext, onSk
 function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, theme }) {
   const [pinLoc, setPinLoc] = useState(initialPin || null)
 
+  useEffect(() => {
+    if (initialPin?.lat && initialPin?.lng) {
+      setPinLoc(initialPin)
+    }
+  }, [initialPin?.lat, initialPin?.lng])
+
   const tileUrl = theme === 'dark'
     ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
     : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png'
@@ -323,6 +330,7 @@ function MapPicker({ c, radius, setRadius, initialPin, onDone, onBack, theme }) 
       >
         <TileLayer key={theme} url={tileUrl} />
         <MapClickHandler onPick={setPinLoc} />
+        {pinLoc && <GpsFlyer target={pinLoc} />}
         {pinLoc && <Marker position={[pinLoc.lat, pinLoc.lng]} icon={PIN_ICON} />}
         {pinLoc && (
           <Circle

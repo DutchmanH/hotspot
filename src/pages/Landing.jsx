@@ -341,6 +341,7 @@ const HERO_POIS = [
   {
     id: "forum",
     name: "Forum Groningen",
+    categoryKey: "culture",
     category: "Cultuur",
     openText: "Open tot 21:00",
     lat: 53.21881,
@@ -351,6 +352,7 @@ const HERO_POIS = [
   {
     id: "drie-gezusters",
     name: "De Drie Gezusters",
+    categoryKey: "food",
     category: "Eten & drinken",
     openText: "Open tot 00:00",
     lat: 53.21824,
@@ -360,18 +362,41 @@ const HERO_POIS = [
   },
 ];
 
-function makePoiIcon(color) {
+function catIconPaths(cat) {
+  const s = "rgba(255,255,255,0.95)";
+  const cx = 14;
+  const cy = 13;
+  if (cat === "food")
+    return (
+      `<line x1="${cx - 2.5}" y1="${cy - 3.5}" x2="${cx - 2.5}" y2="${cy + 3.5}" stroke="${s}" stroke-width="1.5" stroke-linecap="round"/>` +
+      `<line x1="${cx - 2.5}" y1="${cy - 1.5}" x2="${cx + 1}" y2="${cy - 1.5}" stroke="${s}" stroke-width="1.5" stroke-linecap="round"/>` +
+      `<line x1="${cx + 2.5}" y1="${cy - 3.5}" x2="${cx + 2.5}" y2="${cy + 3.5}" stroke="${s}" stroke-width="1.5" stroke-linecap="round"/>` +
+      `<path d="M${cx + 0.5} ${cy - 3.5} C${cx + 4} ${cy - 3.5} ${cx + 4} ${cy} ${cx + 0.5} ${cy}" stroke="${s}" stroke-width="1.3" stroke-linecap="round" fill="none"/>`
+    );
+  if (cat === "outdoor")
+    return (
+      `<polygon points="${cx},${cy - 4} ${cx - 4},${cy + 3.5} ${cx + 4},${cy + 3.5}" fill="none" stroke="${s}" stroke-width="1.4" stroke-linejoin="round"/>` +
+      `<line x1="${cx}" y1="${cy + 3.5}" x2="${cx}" y2="${cy + 5}" stroke="${s}" stroke-width="1.4" stroke-linecap="round"/>`
+    );
+  if (cat === "culture")
+    return (
+      `<rect x="${cx - 4}" y="${cy - 4}" width="8" height="1.8" rx="0.6" fill="${s}"/>` +
+      `<line x1="${cx - 2.5}" y1="${cy - 2.2}" x2="${cx - 2.5}" y2="${cy + 3.5}" stroke="${s}" stroke-width="1.1" stroke-linecap="round"/>` +
+      `<line x1="${cx}" y1="${cy - 2.2}" x2="${cx}" y2="${cy + 3.5}" stroke="${s}" stroke-width="1.1" stroke-linecap="round"/>` +
+      `<line x1="${cx + 2.5}" y1="${cy - 2.2}" x2="${cx + 2.5}" y2="${cy + 3.5}" stroke="${s}" stroke-width="1.1" stroke-linecap="round"/>` +
+      `<rect x="${cx - 4}" y="${cy + 3}" width="8" height="1.5" rx="0.5" fill="${s}"/>`
+    );
+  return `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${s}"/>`;
+}
+
+function makePoiIcon(color, categoryKey = "culture") {
   return L.divIcon({
     className: "",
     html: `<svg width="32" height="42" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg"
          style="display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))">
       <path d="M14 1C7.37 1 2 6.37 2 13c0 8 10.5 20 12 21.5 1.5-1.5 12-13.5 12-21.5C26 6.37 20.63 1 14 1z" fill="${color}"/>
       <circle cx="14" cy="13" r="7" fill="rgba(255,255,255,0.95)"/>
-      <rect x="9.5" y="9" width="9" height="1.8" rx="0.6" fill="${color}"/>
-      <line x1="11.5" y1="10.8" x2="11.5" y2="17" stroke="${color}" stroke-width="1.1" stroke-linecap="round"/>
-      <line x1="14" y1="10.8" x2="14" y2="17" stroke="${color}" stroke-width="1.1" stroke-linecap="round"/>
-      <line x1="16.5" y1="10.8" x2="16.5" y2="17" stroke="${color}" stroke-width="1.1" stroke-linecap="round"/>
-      <rect x="9.5" y="16.5" width="9" height="1.5" rx="0.5" fill="${color}"/>
+      ${catIconPaths(categoryKey)}
     </svg>`,
     iconSize: [32, 42],
     iconAnchor: [16, 42],
@@ -413,7 +438,7 @@ function GroningenMap({
           <Marker
             key={poi.id}
             position={[poi.lat, poi.lng]}
-            icon={makePoiIcon(poi.color)}
+            icon={makePoiIcon(poi.color, poi.categoryKey)}
           >
             {showCard && (
               <Tooltip
@@ -571,15 +596,14 @@ function MobileLanding({ c, lang, setLang, theme, setTheme, onStart }) {
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            background: "var(--accent-wash)",
-            color: "var(--accent-ink)",
+            background: "var(--bg-elev)",
+            color: "var(--ink-soft)",
             borderRadius: "var(--r-pill)",
             padding: "5px 12px",
             fontSize: 12,
-            fontWeight: 500,
+            fontWeight: 600,
             marginBottom: 16,
-            border:
-              "1px solid color-mix(in oklch, var(--accent) 20%, transparent)",
+            border: "1px solid var(--line-soft)",
           }}
         >
           <span
@@ -587,7 +611,7 @@ function MobileLanding({ c, lang, setLang, theme, setTheme, onStart }) {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "var(--accent)",
+              background: "oklch(0.60 0.18 145)",
               display: "inline-block",
             }}
           />
@@ -627,23 +651,46 @@ function MobileLanding({ c, lang, setLang, theme, setTheme, onStart }) {
             flexWrap: "wrap",
           }}
         >
-          {["🍷 Eten", "🌿 Buiten", "🎭 Cultuur", "⚡ Activiteiten"].map(
-            (p) => (
+          {[
+            { key: "food", emoji: "🍷", nl: "Eten", en: "Food" },
+            { key: "outdoor", emoji: "🌿", nl: "Buiten", en: "Outdoors" },
+            { key: "culture", emoji: "🎭", nl: "Cultuur", en: "Culture" },
+            { key: "activities", emoji: "⚡", nl: "Activiteiten", en: "Activities" },
+          ].map((cat) => (
+            <span
+              key={cat.key}
+              style={{
+                padding: "7px 12px 7px 8px",
+                borderRadius: "var(--r-pill)",
+                background: "var(--bg-elev)",
+                border: "1px solid var(--line-soft)",
+                fontSize: 13,
+                color: "var(--ink)",
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                boxShadow: "0 2px 4px rgba(0,0,0,.05)",
+              }}
+            >
               <span
-                key={p}
                 style={{
-                  padding: "6px 12px",
-                  borderRadius: "var(--r-pill)",
-                  background: "var(--bg-elev)",
-                  border: "1px solid var(--line)",
-                  fontSize: 13,
-                  color: "var(--ink-soft)",
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: CAT_COLORS[cat.key],
+                  display: "grid",
+                  placeItems: "center",
+                  color: "#fff",
+                  fontSize: 10,
+                  lineHeight: 1,
                 }}
               >
-                {p}
+                {cat.emoji}
               </span>
-            ),
-          )}
+              {lang === "nl" ? cat.nl : cat.en}
+            </span>
+          ))}
         </div>
 
         <button onClick={onStart} style={ctaStyle}>
@@ -685,55 +732,64 @@ function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
           position: "sticky",
           top: 0,
           zIndex: 50,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 48px",
           height: 64,
           background: "color-mix(in oklch, var(--bg) 85%, transparent)",
           backdropFilter: "blur(16px)",
           borderBottom: "1px solid var(--line-soft)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <LogoMark />
-          <span
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 22,
-              letterSpacing: "-.01em",
-            }}
-          >
-            Hotspot
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-          <a href="#how" style={navLinkStyle}>
-            {c.nav_how}
-          </a>
-          <a href="#cats" style={navLinkStyle}>
-            {c.nav_cats}
-          </a>
-          <a href="#faq" style={navLinkStyle}>
-            {c.nav_faq}
-          </a>
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={() => setLang(lang === "nl" ? "en" : "nl")}
-            style={btnStyle}
-          >
-            {lang === "nl" ? "EN" : "NL"}
-          </button>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            style={btnStyle}
-          >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-          </button>
-          <button onClick={onStart} style={ctaStyle}>
-            {c.cta} <ArrowRightIcon />
-          </button>
+        <div
+          style={{
+            maxWidth: 1200,
+            width: "100%",
+            height: "100%",
+            margin: "0 auto",
+            padding: "0 48px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <LogoMark />
+            <span
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 22,
+                letterSpacing: "-.01em",
+              }}
+            >
+              Hotspot
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+            <a href="#how" style={navLinkStyle}>
+              {c.nav_how}
+            </a>
+            <a href="#cats" style={navLinkStyle}>
+              {c.nav_cats}
+            </a>
+            <a href="#faq" style={navLinkStyle}>
+              {c.nav_faq}
+            </a>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={() => setLang(lang === "nl" ? "en" : "nl")}
+              style={btnStyle}
+            >
+              {lang === "nl" ? "EN" : "NL"}
+            </button>
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              style={btnStyle}
+            >
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button onClick={onStart} style={ctaStyle}>
+              {c.cta} <ArrowRightIcon />
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -757,15 +813,14 @@ function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              background: "var(--accent-wash)",
-              color: "var(--accent-ink)",
+              background: "var(--bg-elev)",
+              color: "var(--ink-soft)",
               borderRadius: "var(--r-pill)",
               padding: "6px 14px",
               fontSize: 12,
-              fontWeight: 500,
+              fontWeight: 600,
               marginBottom: 24,
-              border:
-                "1px solid color-mix(in oklch, var(--accent) 20%, transparent)",
+              border: "1px solid var(--line-soft)",
             }}
           >
             <span
@@ -773,7 +828,7 @@ function DesktopLanding({ c, lang, setLang, theme, setTheme, onStart }) {
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                background: "var(--accent)",
+                background: "oklch(0.60 0.18 145)",
                 display: "inline-block",
               }}
             />

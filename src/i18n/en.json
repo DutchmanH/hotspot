@@ -72,8 +72,13 @@
     "logout": "Log out",
     "stats": {
       "totalSessions": "Total sessions",
+      "uniqueUsers": "Unique users",
       "weekSessions": "Sessions this week",
-      "topCategories": "Popular categories"
+      "topCategories": "Popular categories",
+      "dailySessions": "Sessions per day (last 14 days)",
+      "dailyUniqueUsers": "Unique users per day (last 14 days)",
+      "chartSessions": "Sessions",
+      "chartUsers": "Users"
     }
   },
   "theme": {
