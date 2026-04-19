@@ -1810,7 +1810,7 @@ export default function Kaart() {
   }, []);
 
   useEffect(() => {
-    if (isDesktop) return undefined;
+    if (isDesktop || stage === "landing") return undefined;
 
     const prevBodyOverflow = document.body.style.overflow;
     const prevBodyOverscroll = document.body.style.overscrollBehavior;
@@ -1825,7 +1825,7 @@ export default function Kaart() {
       document.body.style.overscrollBehavior = prevBodyOverscroll;
       document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
     };
-  }, [isDesktop]);
+  }, [isDesktop, stage]);
 
   // Sync theme state with hook
   const setTheme = (t) => {
@@ -1961,10 +1961,10 @@ export default function Kaart() {
       <div
         data-theme={themeState}
         style={{
-          height: "100vh",
-          overflow: isDesktop ? "auto" : "hidden",
-          position: isDesktop ? "relative" : "fixed",
-          inset: isDesktop ? "auto" : 0,
+          minHeight: "100vh",
+          overflowY: "auto",
+          overflowX: "hidden",
+          position: "relative",
           width: "100%",
         }}
       >

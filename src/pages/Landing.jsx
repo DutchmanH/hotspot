@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
@@ -295,6 +295,25 @@ function MoonIcon() {
   );
 }
 
+function GlobeIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a14.5 14.5 0 0 1 0 20 14.5 14.5 0 0 1 0-20z" />
+    </svg>
+  );
+}
+
 function MenuIcon() {
   return (
     <svg
@@ -313,6 +332,25 @@ function MenuIcon() {
     </svg>
   );
 }
+
+function CloseIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
 function ArrowRightIcon() {
   return (
     <svg
@@ -542,185 +580,841 @@ function GroningenMap({
   );
 }
 
+/* ─── Shared: alles onder de hero (zelfde inhoud als desktop) ── */
+function LandingScrollSections({ c, onStart, openFaq, setOpenFaq, isMobile }) {
+  const pad = isMobile ? "48px 20px" : "96px 48px";
+  const howGap = isMobile ? 16 : 32;
+  const cardPad = isMobile ? "24px" : "32px";
+  const gridHow = isMobile ? "1fr" : "repeat(3, 1fr)";
+  const gridCats = isMobile ? "1fr" : "repeat(4, 1fr)";
+  const gridInspo = isMobile ? "1fr" : "repeat(3, 1fr)";
+  const wrap = (max) =>
+    isMobile
+      ? { width: "100%", maxWidth: "100%", margin: 0 }
+      : { maxWidth: max, margin: "0 auto" };
+
+  return (
+    <>
+      <section id="how" style={{ padding: pad, background: "var(--bg-elev)" }}>
+        <div style={wrap(960)}>
+          <SectionHead title={c.how_title} sub={c.how_sub} compact={isMobile} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: gridHow,
+              gap: howGap,
+            }}
+          >
+            {c.steps.map((s) => (
+              <div
+                key={s.n}
+                style={{
+                  padding: cardPad,
+                  borderRadius: "var(--r-lg)",
+                  border: "1px solid var(--line)",
+                  background: "var(--bg)",
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 13,
+                    color: "var(--accent)",
+                    marginBottom: 16,
+                    fontWeight: 600,
+                  }}
+                >
+                  {s.n}
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>
+                  {s.title}
+                </h3>
+                <p
+                  style={{
+                    color: "var(--ink-soft)",
+                    lineHeight: 1.6,
+                    fontSize: 14,
+                  }}
+                >
+                  {s.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="cats" style={{ padding: pad }}>
+        <div style={wrap(1100)}>
+          <SectionHead title={c.cats_title} sub={c.cats_sub} compact={isMobile} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: gridCats,
+              gap: 24,
+            }}
+          >
+            {c.cats.map((cat) => (
+              <div
+                key={cat.label}
+                style={{
+                  borderRadius: "var(--r-lg)",
+                  overflow: "hidden",
+                  border: "1px solid var(--line)",
+                  background: "var(--bg-elev)",
+                }}
+              >
+                <div
+                  style={{
+                    height: 6,
+                    background: CAT_COLORS[cat.color],
+                  }}
+                />
+                <div style={{ padding: isMobile ? 20 : 24 }}>
+                  <h3
+                    style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}
+                  >
+                    {cat.label}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "var(--ink-soft)",
+                      lineHeight: 1.6,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {cat.desc}
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {cat.tags.map((t) => (
+                      <span
+                        key={t}
+                        style={{
+                          fontSize: 11,
+                          padding: "3px 8px",
+                          borderRadius: "var(--r-pill)",
+                          background:
+                            "color-mix(in oklch, " +
+                            CAT_COLORS[cat.color] +
+                            " 12%, transparent)",
+                          color: CAT_COLORS[cat.color],
+                          border:
+                            "1px solid color-mix(in oklch, " +
+                            CAT_COLORS[cat.color] +
+                            " 25%, transparent)",
+                        }}
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ padding: pad, background: "var(--bg-elev)" }}>
+        <div style={wrap(1100)}>
+          <SectionHead title={c.inspo_title} sub={c.inspo_sub} compact={isMobile} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: gridInspo,
+              gap: 24,
+            }}
+          >
+            {c.inspo.map((item, i) => (
+              <div
+                key={item.title}
+                style={{
+                  borderRadius: "var(--r-lg)",
+                  overflow: "hidden",
+                  border: "1px solid var(--line)",
+                  background: "var(--bg)",
+                }}
+              >
+                <div
+                  style={{
+                    height: isMobile ? 88 : 100,
+                    background: CAT_COLORS[INSPO_PATTERNS[i]],
+                    opacity: 0.08,
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  <svg
+                    width="100%"
+                    height="100%"
+                    style={{ position: "absolute", inset: 0, opacity: 1 }}
+                  >
+                    <rect
+                      width="100%"
+                      height="100%"
+                      fill={`url(#inspo-hatch-${i % 4})`}
+                    />
+                    <defs>
+                      <pattern
+                        id={`inspo-hatch-${i % 4}`}
+                        patternUnits="userSpaceOnUse"
+                        width="12"
+                        height="12"
+                        patternTransform={`rotate(${i * 22})`}
+                      >
+                        <line
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="12"
+                          stroke={CAT_COLORS[INSPO_PATTERNS[i]]}
+                          strokeWidth="3"
+                          strokeOpacity=".3"
+                        />
+                      </pattern>
+                    </defs>
+                  </svg>
+                </div>
+                <div style={{ padding: isMobile ? 18 : 20 }}>
+                  <h3
+                    style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}
+                  >
+                    {item.title}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "var(--ink-soft)",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" style={{ padding: pad }}>
+        <div style={wrap(720)}>
+          <SectionHead title={c.faq_title} sub="" compact={isMobile} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {c.faq.map((item, i) => (
+              <div
+                key={i}
+                style={{
+                  borderRadius: "var(--r-md)",
+                  border: "1px solid var(--line)",
+                  overflow: "hidden",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: isMobile ? "16px 18px" : "20px 24px",
+                    background: openFaq === i ? "var(--bg-elev)" : "var(--bg)",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--ink)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: isMobile ? 14 : 15,
+                    fontWeight: 500,
+                    textAlign: "left",
+                  }}
+                >
+                  {item.q}
+                  <span
+                    style={{
+                      transition: "transform .2s",
+                      transform: openFaq === i ? "rotate(180deg)" : "none",
+                      color: "var(--ink-faint)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ChevDownIcon />
+                  </span>
+                </button>
+                {openFaq === i && (
+                  <div
+                    style={{
+                      padding: isMobile ? "0 18px 16px" : "0 24px 20px",
+                      color: "var(--ink-soft)",
+                      lineHeight: 1.7,
+                      fontSize: 14,
+                      background: "var(--bg-elev)",
+                    }}
+                  >
+                    {item.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        style={{
+          padding: pad,
+          background: "var(--accent)",
+          color: "oklch(0.98 0.01 85)",
+          textAlign: "center",
+        }}
+      >
+        <h2
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "clamp(24px, 6vw, 52px)",
+            marginBottom: 16,
+            letterSpacing: "-.02em",
+          }}
+        >
+          {c.cta2_title}
+        </h2>
+        <p
+          style={{
+            fontSize: isMobile ? 15 : 17,
+            opacity: 0.85,
+            marginBottom: 40,
+            maxWidth: 480,
+            margin: "0 auto 40px",
+          }}
+        >
+          {c.cta2_sub}
+        </p>
+        <button
+          type="button"
+          onClick={onStart}
+          style={{
+            padding: isMobile ? "14px 28px" : "16px 36px",
+            borderRadius: "var(--r-pill)",
+            background: "oklch(0.98 0.01 85)",
+            color: "var(--accent)",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 700,
+            fontSize: isMobile ? 15 : 16,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          {c.cta} <ArrowRightIcon />
+        </button>
+      </section>
+
+      <footer
+        style={{
+          padding: isMobile ? "24px 20px" : "24px 48px",
+          background: "var(--bg)",
+          borderTop: "1px solid var(--line-soft)",
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          justifyContent: "space-between",
+          alignItems: isMobile ? "flex-start" : "center",
+          gap: isMobile ? 16 : 0,
+          fontSize: 13,
+          color: "var(--ink-faint)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <LogoMark />
+          <span>{c.footer}</span>
+        </div>
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          <a
+            href="#how"
+            style={{ color: "var(--ink-faint)", textDecoration: "none" }}
+          >
+            {c.nav_how}
+          </a>
+          <a
+            href="#faq"
+            style={{ color: "var(--ink-faint)", textDecoration: "none" }}
+          >
+            FAQ
+          </a>
+        </div>
+      </footer>
+    </>
+  );
+}
+
 /* ─── Mobile landing ─────────────────────────────────────────── */
-function MobileLanding({ c, lang, theme, onStart, onOpenSettings }) {
+function MobileLanding({
+  c,
+  lang,
+  setLang,
+  theme,
+  setTheme,
+  onStart,
+  accountButtonLabel,
+  onAccountAction,
+}) {
+  const [openFaq, setOpenFaq] = useState(null);
+  const [navModalOpen, setNavModalOpen] = useState(false);
+
+  const iconBarBtn = {
+    ...btnStyle,
+    minWidth: 40,
+    minHeight: 40,
+    padding: 0,
+    background: "color-mix(in oklch, var(--bg-elev) 75%, transparent)",
+    borderColor: "var(--line-soft)",
+  };
+
+  useEffect(() => {
+    if (!navModalOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape") setNavModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navModalOpen]);
+
+  const scrollToHash = useCallback((hash) => {
+    setNavModalOpen(false);
+    window.setTimeout(() => {
+      document.querySelector(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 90);
+  }, []);
+
+  const navRowBtn = {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "14px 4px",
+    minHeight: 48,
+    border: "none",
+    borderBottom: "1px solid var(--line-soft)",
+    background: "transparent",
+    color: "var(--ink)",
+    fontFamily: "var(--font-sans)",
+    fontSize: 15,
+    fontWeight: 500,
+    cursor: "pointer",
+    textAlign: "left",
+  };
+
   return (
     <div
       style={{
         position: "relative",
         width: "100%",
-        height: "100%",
-        overflow: "hidden",
+        minHeight: "100dvh",
+        overflowX: "hidden",
         background: "var(--bg)",
       }}
     >
-      <GroningenMap theme={theme} showCard mobileView />
-
-      {/* Top bar */}
+      {/* Hero: kaart op volle hoogte, titel weer over de kaart */}
       <div
+        id="landing-hero"
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 20px",
+          position: "relative",
+          width: "100%",
+          minHeight: "100dvh",
+          height: "100dvh",
+          overflow: "hidden",
+          background: "var(--bg)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <LogoMark />
-          <span
+        <GroningenMap theme={theme} showCard mobileView />
+
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "calc(12px + env(safe-area-inset-top, 0px)) 20px 16px",
+            background:
+              "linear-gradient(to bottom, color-mix(in oklch, var(--bg) 55%, transparent) 0%, transparent 100%)",
+            pointerEvents: "none",
+          }}
+        >
+          <div
             style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 20,
-              color: "var(--ink)",
-              letterSpacing: "-.01em",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              pointerEvents: "auto",
             }}
           >
-            Hotspot
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onOpenSettings} style={btnStyle} title="Menu">
-            <MenuIcon />
-          </button>
-        </div>
-      </div>
-
-      {/* Glass card bottom */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          padding: "32px 24px 40px",
-          background: "linear-gradient(to top, var(--bg) 70%, transparent)",
-        }}
-      >
-        {/* Badge */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "var(--bg-elev)",
-            color: "var(--ink-soft)",
-            borderRadius: "var(--r-pill)",
-            padding: "5px 12px",
-            fontSize: 12,
-            fontWeight: 600,
-            marginBottom: 16,
-            border: "1px solid var(--line-soft)",
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "oklch(0.60 0.18 145)",
-              display: "inline-block",
-            }}
-          />
-          {c.badge}
-        </div>
-
-        <h1
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "clamp(32px, 9vw, 48px)",
-            lineHeight: 1.1,
-            color: "var(--ink)",
-            marginBottom: 12,
-            letterSpacing: "-.02em",
-          }}
-        >
-          {c.tagline}
-        </h1>
-
-        <p
-          style={{
-            color: "var(--ink-soft)",
-            fontSize: 15,
-            lineHeight: 1.5,
-            marginBottom: 28,
-          }}
-        >
-          {c.sub}
-        </p>
-
-        {/* Category pills */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 28,
-            flexWrap: "wrap",
-          }}
-        >
-          {[
-            { key: "food", emoji: "🍷", nl: "Eten", en: "Food" },
-            { key: "outdoor", emoji: "🌿", nl: "Buiten", en: "Outdoors" },
-            { key: "culture", emoji: "🎭", nl: "Cultuur", en: "Culture" },
-            { key: "activities", emoji: "⚡", nl: "Activiteiten", en: "Activities" },
-          ].map((cat) => (
+            <LogoMark />
             <span
-              key={cat.key}
               style={{
-                padding: "7px 12px 7px 8px",
-                borderRadius: "var(--r-pill)",
-                background: "var(--bg-elev)",
-                border: "1px solid var(--line-soft)",
-                fontSize: 13,
+                fontFamily: "var(--font-display)",
+                fontSize: 20,
                 color: "var(--ink)",
-                fontWeight: 500,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                boxShadow: "0 2px 4px rgba(0,0,0,.05)",
+                letterSpacing: "-.01em",
+                textShadow: "0 1px 12px color-mix(in oklch, var(--bg) 80%, transparent)",
               }}
             >
-              <span
-                style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: "50%",
-                  background: CAT_COLORS[cat.key],
-                  display: "grid",
-                  placeItems: "center",
-                  color: "#fff",
-                  fontSize: 10,
-                  lineHeight: 1,
-                }}
-              >
-                {cat.emoji}
-              </span>
-              {lang === "nl" ? cat.nl : cat.en}
+              Hotspot
             </span>
-          ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, pointerEvents: "auto" }}>
+            <button
+              type="button"
+              onClick={() => setLang(lang === "nl" ? "en" : "nl")}
+              style={iconBarBtn}
+              title={lang === "nl" ? "English" : "Nederlands"}
+              aria-label={lang === "nl" ? "Schakel naar Engels" : "Switch to Dutch"}
+            >
+              <GlobeIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              style={iconBarBtn}
+              title={lang === "nl" ? "Thema" : "Theme"}
+              aria-label={lang === "nl" ? "Wissel thema" : "Toggle theme"}
+            >
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setNavModalOpen(true)}
+              style={iconBarBtn}
+              title={lang === "nl" ? "Menu" : "Menu"}
+              aria-expanded={navModalOpen}
+            >
+              <MenuIcon />
+            </button>
+          </div>
         </div>
 
-        <button onClick={onStart} style={ctaStyle}>
-          {c.cta}
-          <ArrowRightIcon />
-        </button>
-
-        <p
+        <div
           style={{
-            marginTop: 14,
-            fontSize: 12,
-            color: "var(--ink-faint)",
-            textAlign: "center",
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            padding:
+              "28px 24px calc(28px + env(safe-area-inset-bottom, 0px))",
+            background:
+              "linear-gradient(to top, var(--bg) 78%, color-mix(in oklch, var(--bg) 35%, transparent) 100%)",
+            pointerEvents: "auto",
           }}
         >
-          {c.hint}
-        </p>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "var(--bg-elev)",
+              color: "var(--ink-soft)",
+              borderRadius: "var(--r-pill)",
+              padding: "5px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              marginBottom: 14,
+              border: "1px solid var(--line-soft)",
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "oklch(0.60 0.18 145)",
+                display: "inline-block",
+              }}
+            />
+            {c.badge}
+          </div>
+
+          <h1
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(30px, 8.5vw, 46px)",
+              lineHeight: 1.08,
+              color: "var(--ink)",
+              marginBottom: 10,
+              letterSpacing: "-.02em",
+              textShadow: "0 1px 14px color-mix(in oklch, var(--bg) 85%, transparent)",
+            }}
+          >
+            {c.tagline}
+          </h1>
+
+          <p
+            style={{
+              color: "var(--ink-soft)",
+              fontSize: 14,
+              lineHeight: 1.5,
+              marginBottom: 20,
+              textShadow: "0 1px 10px color-mix(in oklch, var(--bg) 90%, transparent)",
+            }}
+          >
+            {c.sub}
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 22,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { key: "food", emoji: "🍷", nl: "Eten", en: "Food" },
+              { key: "outdoor", emoji: "🌿", nl: "Buiten", en: "Outdoors" },
+              { key: "culture", emoji: "🎭", nl: "Cultuur", en: "Culture" },
+              { key: "activities", emoji: "⚡", nl: "Activiteiten", en: "Activities" },
+            ].map((cat) => (
+              <span
+                key={cat.key}
+                style={{
+                  padding: "7px 12px 7px 8px",
+                  borderRadius: "var(--r-pill)",
+                  background: "var(--bg-elev)",
+                  border: "1px solid var(--line-soft)",
+                  fontSize: 13,
+                  color: "var(--ink)",
+                  fontWeight: 500,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+                }}
+              >
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    background: CAT_COLORS[cat.key],
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#fff",
+                    fontSize: 10,
+                    lineHeight: 1,
+                  }}
+                >
+                  {cat.emoji}
+                </span>
+                {lang === "nl" ? cat.nl : cat.en}
+              </span>
+            ))}
+          </div>
+
+          <button type="button" onClick={onStart} style={{ ...ctaStyle, width: "100%", justifyContent: "center" }}>
+            {c.cta}
+            <ArrowRightIcon />
+          </button>
+
+          <p
+            style={{
+              marginTop: 12,
+              fontSize: 12,
+              color: "var(--ink-faint)",
+              textAlign: "center",
+            }}
+          >
+            {c.hint}
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 24,
+              marginTop: 22,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              ["100%", lang === "nl" ? "gratis" : "free"],
+              ["0", lang === "nl" ? "account nodig" : "account needed"],
+              ["NL", lang === "nl" ? "heel Nederland" : "all of NL"],
+            ].map(([n, l]) => (
+              <div key={l} style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 22,
+                    color: "var(--accent)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {n}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ink-faint)",
+                    marginTop: 4,
+                  }}
+                >
+                  {l}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      <LandingScrollSections
+        c={c}
+        onStart={onStart}
+        openFaq={openFaq}
+        setOpenFaq={setOpenFaq}
+        isMobile
+      />
+
+      {navModalOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={lang === "nl" ? "Navigatie" : "Navigation"}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2000,
+            background: "var(--bg)",
+            display: "flex",
+            flexDirection: "column",
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "16px 20px",
+              borderBottom: "1px solid var(--line-soft)",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <LogoMark />
+              <span
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 20,
+                  color: "var(--ink)",
+                  letterSpacing: "-.01em",
+                }}
+              >
+                Hotspot
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNavModalOpen(false)}
+              style={{ ...iconBarBtn, minWidth: 44, minHeight: 44 }}
+              aria-label={lang === "nl" ? "Sluiten" : "Close"}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "8px 20px 24px",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <p
+              style={{
+                margin: "12px 0 8px",
+                fontSize: 13,
+                color: "var(--ink-soft)",
+                fontWeight: 500,
+              }}
+            >
+              {lang === "nl" ? "Ga naar sectie" : "Go to section"}
+            </p>
+            <button type="button" style={navRowBtn} onClick={() => scrollToHash("#how")}>
+              <span>{c.nav_how}</span>
+              <span style={{ color: "var(--ink-faint)", fontSize: 18 }}>›</span>
+            </button>
+            <button type="button" style={navRowBtn} onClick={() => scrollToHash("#cats")}>
+              <span>{c.nav_cats}</span>
+              <span style={{ color: "var(--ink-faint)", fontSize: 18 }}>›</span>
+            </button>
+            <button type="button" style={navRowBtn} onClick={() => scrollToHash("#faq")}>
+              <span>{c.nav_faq}</span>
+              <span style={{ color: "var(--ink-faint)", fontSize: 18 }}>›</span>
+            </button>
+            <button
+              type="button"
+              style={{ ...navRowBtn, borderBottom: "none", marginTop: 8 }}
+              onClick={() => scrollToHash("#landing-hero")}
+            >
+              <span style={{ color: "var(--ink-soft)", fontSize: 14 }}>
+                {lang === "nl" ? "Terug naar start" : "Back to top"}
+              </span>
+              <span style={{ color: "var(--ink-faint)", fontSize: 18 }}>›</span>
+            </button>
+          </div>
+
+          <div
+            style={{
+              padding: "16px 20px 20px",
+              borderTop: "1px solid var(--line-soft)",
+              background: "var(--bg)",
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              style={{
+                width: "100%",
+                padding: "14px 18px",
+                borderRadius: "var(--r-md)",
+                border: "1px solid var(--line)",
+                background: "transparent",
+                color: "var(--ink)",
+                fontFamily: "var(--font-sans)",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                setNavModalOpen(false);
+                onAccountAction();
+              }}
+            >
+              {accountButtonLabel}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -956,371 +1650,21 @@ function DesktopLanding({ c, theme, onStart, onOpenAuth, onOpenAccount, user, ac
         </div>
       </section>
 
-      {/* ── How it works ── */}
-      <section
-        id="how"
-        style={{ padding: "96px 48px", background: "var(--bg-elev)" }}
-      >
-        <div style={{ maxWidth: 960, margin: "0 auto" }}>
-          <SectionHead title={c.how_title} sub={c.how_sub} />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 32,
-            }}
-          >
-            {c.steps.map((s) => (
-              <div
-                key={s.n}
-                style={{
-                  padding: "32px",
-                  borderRadius: "var(--r-lg)",
-                  border: "1px solid var(--line)",
-                  background: "var(--bg)",
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 13,
-                    color: "var(--accent)",
-                    marginBottom: 16,
-                    fontWeight: 600,
-                  }}
-                >
-                  {s.n}
-                </div>
-                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>
-                  {s.title}
-                </h3>
-                <p
-                  style={{
-                    color: "var(--ink-soft)",
-                    lineHeight: 1.6,
-                    fontSize: 14,
-                  }}
-                >
-                  {s.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Categories ── */}
-      <section id="cats" style={{ padding: "96px 48px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <SectionHead title={c.cats_title} sub={c.cats_sub} />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 24,
-            }}
-          >
-            {c.cats.map((cat) => (
-              <div
-                key={cat.label}
-                style={{
-                  borderRadius: "var(--r-lg)",
-                  overflow: "hidden",
-                  border: "1px solid var(--line)",
-                  background: "var(--bg-elev)",
-                }}
-              >
-                {/* Color strip */}
-                <div
-                  style={{
-                    height: 6,
-                    background: CAT_COLORS[cat.color],
-                  }}
-                />
-                <div style={{ padding: 24 }}>
-                  <h3
-                    style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}
-                  >
-                    {cat.label}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "var(--ink-soft)",
-                      lineHeight: 1.6,
-                      marginBottom: 16,
-                    }}
-                  >
-                    {cat.desc}
-                  </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {cat.tags.map((t) => (
-                      <span
-                        key={t}
-                        style={{
-                          fontSize: 11,
-                          padding: "3px 8px",
-                          borderRadius: "var(--r-pill)",
-                          background:
-                            "color-mix(in oklch, " +
-                            CAT_COLORS[cat.color] +
-                            " 12%, transparent)",
-                          color: CAT_COLORS[cat.color],
-                          border:
-                            "1px solid color-mix(in oklch, " +
-                            CAT_COLORS[cat.color] +
-                            " 25%, transparent)",
-                        }}
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Inspiration grid ── */}
-      <section style={{ padding: "96px 48px", background: "var(--bg-elev)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <SectionHead title={c.inspo_title} sub={c.inspo_sub} />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 24,
-            }}
-          >
-            {c.inspo.map((item, i) => (
-              <div
-                key={item.title}
-                style={{
-                  borderRadius: "var(--r-lg)",
-                  overflow: "hidden",
-                  border: "1px solid var(--line)",
-                  background: "var(--bg)",
-                }}
-              >
-                {/* SVG pattern thumbnail */}
-                <div
-                  style={{
-                    height: 100,
-                    background: CAT_COLORS[INSPO_PATTERNS[i]],
-                    opacity: 0.08,
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                >
-                  <svg
-                    width="100%"
-                    height="100%"
-                    style={{ position: "absolute", inset: 0, opacity: 1 }}
-                  >
-                    <rect
-                      width="100%"
-                      height="100%"
-                      fill={`url(#inspo-hatch-${i % 4})`}
-                    />
-                    <defs>
-                      <pattern
-                        id={`inspo-hatch-${i % 4}`}
-                        patternUnits="userSpaceOnUse"
-                        width="12"
-                        height="12"
-                        patternTransform={`rotate(${i * 22})`}
-                      >
-                        <line
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="12"
-                          stroke={CAT_COLORS[INSPO_PATTERNS[i]]}
-                          strokeWidth="3"
-                          strokeOpacity=".3"
-                        />
-                      </pattern>
-                    </defs>
-                  </svg>
-                </div>
-                <div style={{ padding: 20 }}>
-                  <h3
-                    style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}
-                  >
-                    {item.title}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "var(--ink-soft)",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {item.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── FAQ ── */}
-      <section id="faq" style={{ padding: "96px 48px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <SectionHead title={c.faq_title} sub="" />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {c.faq.map((item, i) => (
-              <div
-                key={i}
-                style={{
-                  borderRadius: "var(--r-md)",
-                  border: "1px solid var(--line)",
-                  overflow: "hidden",
-                }}
-              >
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "20px 24px",
-                    background: openFaq === i ? "var(--bg-elev)" : "var(--bg)",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--ink)",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: 15,
-                    fontWeight: 500,
-                    textAlign: "left",
-                  }}
-                >
-                  {item.q}
-                  <span
-                    style={{
-                      transition: "transform .2s",
-                      transform: openFaq === i ? "rotate(180deg)" : "none",
-                      color: "var(--ink-faint)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ChevDownIcon />
-                  </span>
-                </button>
-                {openFaq === i && (
-                  <div
-                    style={{
-                      padding: "0 24px 20px",
-                      color: "var(--ink-soft)",
-                      lineHeight: 1.7,
-                      fontSize: 14,
-                      background: "var(--bg-elev)",
-                    }}
-                  >
-                    {item.a}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA section ── */}
-      <section
-        style={{
-          padding: "96px 48px",
-          background: "var(--accent)",
-          color: "oklch(0.98 0.01 85)",
-          textAlign: "center",
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "clamp(28px, 4vw, 52px)",
-            marginBottom: 16,
-            letterSpacing: "-.02em",
-          }}
-        >
-          {c.cta2_title}
-        </h2>
-        <p
-          style={{
-            fontSize: 17,
-            opacity: 0.85,
-            marginBottom: 40,
-            maxWidth: 480,
-            margin: "0 auto 40px",
-          }}
-        >
-          {c.cta2_sub}
-        </p>
-        <button
-          onClick={onStart}
-          style={{
-            padding: "16px 36px",
-            borderRadius: "var(--r-pill)",
-            background: "oklch(0.98 0.01 85)",
-            color: "var(--accent)",
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "var(--font-sans)",
-            fontWeight: 700,
-            fontSize: 16,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          {c.cta} <ArrowRightIcon />
-        </button>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer
-        style={{
-          padding: "24px 48px",
-          background: "var(--bg)",
-          borderTop: "1px solid var(--line-soft)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          fontSize: 13,
-          color: "var(--ink-faint)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <LogoMark />
-          <span>{c.footer}</span>
-        </div>
-        <div style={{ display: "flex", gap: 24 }}>
-          <a
-            href="#how"
-            style={{ color: "var(--ink-faint)", textDecoration: "none" }}
-          >
-            {c.nav_how}
-          </a>
-          <a
-            href="#faq"
-            style={{ color: "var(--ink-faint)", textDecoration: "none" }}
-          >
-            FAQ
-          </a>
-        </div>
-      </footer>
+      <LandingScrollSections
+        c={c}
+        onStart={onStart}
+        openFaq={openFaq}
+        setOpenFaq={setOpenFaq}
+        isMobile={false}
+      />
     </div>
   );
 }
 
 /* ─── Helpers ────────────────────────────────────────────────── */
-function SectionHead({ title, sub }) {
+function SectionHead({ title, sub, compact }) {
   return (
-    <div style={{ textAlign: "center", marginBottom: 48 }}>
+    <div style={{ textAlign: "center", marginBottom: compact ? 28 : 48 }}>
       <h2
         style={{
           fontFamily: "var(--font-display)",
@@ -1427,9 +1771,15 @@ export default function Landing({
         <MobileLanding
           c={c}
           lang={lang}
+          setLang={setLang}
           theme={theme}
+          setTheme={setTheme}
           onStart={onStart}
-          onOpenSettings={() => setShowSettings(true)}
+          accountButtonLabel={accountMenuLabel}
+          onAccountAction={() => {
+            if (user) openAccountHome();
+            else setShowAuthModal(true);
+          }}
         />
       )}
       {showSettings && (
