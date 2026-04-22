@@ -22,7 +22,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+const OVERPASS_INSTANCES = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+]
 
 // Bounding box van Nederland (south,west,north,east)
 const NL_BBOX = '50.5,3.3,53.7,7.3'
@@ -99,38 +103,51 @@ function getSubcategory(tags) {
 }
 
 async function fetchOverpassCategory(category, inner) {
-  const query = `[out:json][timeout:300];(${inner});out center;`
+  const query = `[out:json][timeout:300][maxsize:1073741824];(${inner.trim()});out center;`
 
   console.log(`  → Overpass query voor categorie: ${category}`)
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(OVERPASS_URL, {
-        method: 'POST',
-        body: `data=${encodeURIComponent(query)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        signal: AbortSignal.timeout(330_000),
-      })
+  for (let instanceIdx = 0; instanceIdx < OVERPASS_INSTANCES.length; instanceIdx++) {
+    const url = OVERPASS_INSTANCES[instanceIdx]
+    if (instanceIdx > 0) console.log(`  Probeer instantie ${instanceIdx + 1}: ${url}`)
 
-      if (res.status === 429) {
-        console.log(`  Rate-limit bij ${category}, wacht 70 seconden...`)
-        await sleep(70_000)
-        continue
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          body: `data=${encodeURIComponent(query)}`,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'hotspot-poi-sync/1.0 (https://github.com/DutchmanH/hotspot)',
+          },
+          signal: AbortSignal.timeout(330_000),
+        })
 
-      const data = await res.json()
-      console.log(`  ✓ ${data.elements.length} elementen ontvangen voor ${category}`)
-      return data.elements
-    } catch (err) {
-      if (attempt < 2) {
-        console.log(`  Poging ${attempt + 1} mislukt (${err.message}), opnieuw over 10s...`)
-        await sleep(10_000)
-      } else {
-        throw err
+        if (res.status === 429) {
+          console.log(`  Rate-limit, wacht 70 seconden...`)
+          await sleep(70_000)
+          continue
+        }
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          throw new Error(`HTTP ${res.status}${text ? ': ' + text.slice(0, 120) : ''}`)
+        }
+
+        const data = await res.json()
+        console.log(`  ✓ ${data.elements.length} elementen ontvangen voor ${category}`)
+        return data.elements
+      } catch (err) {
+        if (attempt < 1) {
+          console.log(`  Poging ${attempt + 1} mislukt (${err.message}), opnieuw over 10s...`)
+          await sleep(10_000)
+        } else {
+          console.log(`  Instantie ${instanceIdx + 1} mislukt: ${err.message}`)
+        }
       }
     }
   }
+
+  throw new Error(`Alle Overpass instanties mislukt voor categorie ${category}`)
 }
 
 function parseElements(elements, category) {
