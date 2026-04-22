@@ -1851,8 +1851,6 @@ export default function Kaart() {
   const poiFetchAbortRef = useRef(null);
   const fetchedContextRef = useRef(null);
   const loadClockStartRef = useRef(0);
-  const boundsFetchDebounceRef = useRef(null);
-  const boundsFetchRequestRef = useRef(null);
   const isFetchingRef = useRef(false);
 
   const clearVisibilityFilters = useCallback(() => {
@@ -2065,72 +2063,9 @@ export default function Kaart() {
     }
   }
 
-  const handleBoundsChange = useCallback(
-    (bounds) => {
-      if (!bounds || !userLocation?.lat || !userLocation?.lng) return;
-      if (manualMode) return;
-      if (isFetchingRef.current) return;
-
-      const centerLat = userLocation.lat;
-      const centerLng = userLocation.lng;
-      const sw = bounds._southWest;
-      const ne = bounds._northEast;
-      if (!sw || !ne) return;
-
-      const corners = [
-        [sw.lat, sw.lng],
-        [sw.lat, ne.lng],
-        [ne.lat, sw.lng],
-        [ne.lat, ne.lng],
-      ];
-      const maxCornerKm = corners.reduce((maxDist, [lat, lng]) => {
-        return Math.max(maxDist, calcDistance(centerLat, centerLng, lat, lng));
-      }, 0);
-      const minRadius = filters.radius < 99999 ? filters.radius : radius;
-      const targetRadius = Math.max(
-        minRadius,
-        Math.ceil((maxCornerKm * 1000 * 1.15) / 250) * 250,
-      );
-      if (!Number.isFinite(targetRadius) || targetRadius <= 0) return;
-
-      const fetchedContext = fetchedContextRef.current;
-      const centerShiftMeters = fetchedContext
-        ? calcDistance(centerLat, centerLng, fetchedContext.lat, fetchedContext.lng) * 1000
-        : Number.POSITIVE_INFINITY;
-      const outsideFetchedContext =
-        !fetchedContext ||
-        centerShiftMeters > 220 ||
-        targetRadius > fetchedContext.maxRadius * 1.1;
-      if (!outsideFetchedContext) return;
-
-      const lastBoundsRequest = boundsFetchRequestRef.current;
-      const similarRecentRequest =
-        lastBoundsRequest &&
-        calcDistance(
-          centerLat,
-          centerLng,
-          lastBoundsRequest.lat,
-          lastBoundsRequest.lng,
-        ) *
-          1000 <
-          120 &&
-        targetRadius <= lastBoundsRequest.radius * 1.05;
-      if (similarRecentRequest) return;
-
-      if (boundsFetchDebounceRef.current) {
-        clearTimeout(boundsFetchDebounceRef.current);
-      }
-      boundsFetchDebounceRef.current = setTimeout(() => {
-        boundsFetchRequestRef.current = {
-          lat: centerLat,
-          lng: centerLng,
-          radius: targetRadius,
-        };
-        loadPOIs(centerLat, centerLng, targetRadius);
-      }, 280);
-    },
-    [filters.radius, manualMode, radius, userLocation?.lat, userLocation?.lng],
-  );
+  // Kaartbewegingen (pan/zoom) triggeren geen nieuwe fetch.
+  // Data wordt alleen geladen bij locatiewijziging of filterwijziging.
+  const handleBoundsChange = useCallback(() => {}, []);
 
   const applyFilters = useCallback(
     async (nextFilters) => {
