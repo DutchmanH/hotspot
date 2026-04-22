@@ -1436,30 +1436,39 @@ function DesktopLanding({ c, theme, onStart, onOpenAuth, onOpenAccount, user, ac
         style={{
           height: 34,
           borderBottom: "1px solid var(--line-soft)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          padding: "0 48px",
           background: "var(--bg)",
         }}
       >
-        <button
-          onClick={user ? onOpenAccount : onOpenAuth}
+        <div
           style={{
-            border: "none",
-            background: "transparent",
-            color: "var(--ink-soft)",
-            fontFamily: "var(--font-sans)",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            textDecoration: "underline",
-            textUnderlineOffset: 3,
-            padding: 0,
+            maxWidth: 1200,
+            width: "100%",
+            height: "100%",
+            margin: "0 auto",
+            padding: "0 48px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
           }}
         >
-          {accountLinkLabel}
-        </button>
+          <button
+            onClick={user ? onOpenAccount : onOpenAuth}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "var(--ink-soft)",
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+              padding: 0,
+            }}
+          >
+            {accountLinkLabel}
+          </button>
+        </div>
       </div>
 
       {/* ── Nav ── */}
