@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js'
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+const OVERPASS_URL = '/api/overpass'
 
 // Bounding box van Nederland — POIs binnen dit gebied komen uit Supabase
 const NL_BOUNDS = { minLat: 50.5, maxLat: 53.7, minLng: 3.3, maxLng: 7.3 }
