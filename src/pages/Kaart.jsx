@@ -947,15 +947,21 @@ function DesktopApp({
   manualMode,
   onLocationSet,
   pinDropCycle,
+  onBoundsChange,
   loadedPoiCount,
   showFilterHint,
   onClearFilters,
   adminLoaderDebug,
   setAdminLoaderDebug,
+  debugSource,
   mapExtraFavoritePois = [],
   favoritePoisForList = [],
 }) {
   const t = COPY[lang];
+  const mapDebugProps = /** @type {any} */ ({
+    debugEnabled: isAdmin && adminLoaderDebug,
+    debugSource,
+  });
 
   return (
     <div
@@ -1424,7 +1430,7 @@ function DesktopApp({
             pois={pois}
             extraFavoritePois={mapExtraFavoritePois}
             favoriteIds={favorites}
-            onBoundsChange={() => {}}
+            onBoundsChange={onBoundsChange}
             onSelectPoi={setSelected}
             mapRef={mapRef}
             userLocation={userLocation}
@@ -1434,6 +1440,7 @@ function DesktopApp({
             theme={theme}
             selectedId={selected?.id}
             pinDropCycle={pinDropCycle}
+            {...mapDebugProps}
           />
           {/* Recenter + zoom */}
           <div
@@ -1844,6 +1851,8 @@ export default function Kaart() {
   const poiFetchAbortRef = useRef(null);
   const fetchedContextRef = useRef(null);
   const loadClockStartRef = useRef(0);
+  const boundsFetchDebounceRef = useRef(null);
+  const boundsFetchRequestRef = useRef(null);
 
   const clearVisibilityFilters = useCallback(() => {
     setActiveCats([]);
@@ -1862,6 +1871,14 @@ export default function Kaart() {
   useEffect(() => {
     localStorage.setItem("hotspot_admin_loader_debug", adminLoaderDebug ? "1" : "0");
   }, [adminLoaderDebug]);
+
+  useEffect(() => {
+    return () => {
+      if (boundsFetchDebounceRef.current) {
+        clearTimeout(boundsFetchDebounceRef.current);
+      }
+    };
+  }, []);
 
   /** Live elapsed for admin loader debug only (drives re-renders while overlay is up). */
   useEffect(() => {
@@ -1934,34 +1951,35 @@ export default function Kaart() {
       });
 
       if (!raw?.length) {
-        if (!merge) {
-          setAllPois([]);
-          setLoadError({ code: "general" });
-          return;
-        }
+        setAllPois([]);
+        if (!merge) setLoadError({ code: "general" });
         fetchedContextRef.current = { lat, lng, maxRadius: r };
         return;
       }
 
-      // Enrich with distance + open status
-      const enriched = raw
+      // Verrijk afstand eerst (goedkoop) zodat markers meteen verschijnen
+      const withDist = raw
         .map((p) => ({
           ...p,
           _dist: calcDistance(lat, lng, p.lat, p.lng),
-          _open: evaluateOpenState(p.tags?.opening_hours),
+          _open: null, // nog niet berekend
         }))
         .sort((a, b) => a._dist - b._dist);
-      if (!merge) {
-        setAllPois(enriched);
-      } else {
-        setAllPois((prev) => {
-          const mergedById = new globalThis.Map();
-          prev.forEach((poi) => mergedById.set(poi.id, poi));
-          enriched.forEach((poi) => mergedById.set(poi.id, poi));
-          return Array.from(mergedById.values()).sort((a, b) => a._dist - b._dist);
-        });
-      }
+
+      setAllPois(withDist);
       fetchedContextRef.current = { lat, lng, maxRadius: r };
+
+      // Bereken opening hours asynchroon zodat de UI niet blokkeert
+      setTimeout(() => {
+        if (reqId !== requestSeqRef.current) return;
+        setAllPois((prev) =>
+          prev.map((p) =>
+            p._open === null
+              ? { ...p, _open: evaluateOpenState(p.tags?.opening_hours) }
+              : p,
+          ),
+        );
+      }, 0);
     } catch (err) {
       if (reqId !== requestSeqRef.current) return;
       if (err?.name === "AbortError") return;
@@ -2044,9 +2062,76 @@ export default function Kaart() {
     }
   }
 
+  const handleBoundsChange = useCallback(
+    (bounds) => {
+      if (!bounds || !userLocation?.lat || !userLocation?.lng) return;
+      if (manualMode) return;
+
+      const centerLat = userLocation.lat;
+      const centerLng = userLocation.lng;
+      const sw = bounds._southWest;
+      const ne = bounds._northEast;
+      if (!sw || !ne) return;
+
+      const corners = [
+        [sw.lat, sw.lng],
+        [sw.lat, ne.lng],
+        [ne.lat, sw.lng],
+        [ne.lat, ne.lng],
+      ];
+      const maxCornerKm = corners.reduce((maxDist, [lat, lng]) => {
+        return Math.max(maxDist, calcDistance(centerLat, centerLng, lat, lng));
+      }, 0);
+      const minRadius = filters.radius < 99999 ? filters.radius : radius;
+      const targetRadius = Math.max(
+        minRadius,
+        Math.ceil((maxCornerKm * 1000 * 1.15) / 250) * 250,
+      );
+      if (!Number.isFinite(targetRadius) || targetRadius <= 0) return;
+
+      const fetchedContext = fetchedContextRef.current;
+      const centerShiftMeters = fetchedContext
+        ? calcDistance(centerLat, centerLng, fetchedContext.lat, fetchedContext.lng) * 1000
+        : Number.POSITIVE_INFINITY;
+      const outsideFetchedContext =
+        !fetchedContext ||
+        centerShiftMeters > 220 ||
+        targetRadius > fetchedContext.maxRadius * 1.1;
+      if (!outsideFetchedContext) return;
+
+      const lastBoundsRequest = boundsFetchRequestRef.current;
+      const similarRecentRequest =
+        lastBoundsRequest &&
+        calcDistance(
+          centerLat,
+          centerLng,
+          lastBoundsRequest.lat,
+          lastBoundsRequest.lng,
+        ) *
+          1000 <
+          120 &&
+        targetRadius <= lastBoundsRequest.radius * 1.05;
+      if (similarRecentRequest) return;
+
+      if (boundsFetchDebounceRef.current) {
+        clearTimeout(boundsFetchDebounceRef.current);
+      }
+      boundsFetchDebounceRef.current = setTimeout(() => {
+        boundsFetchRequestRef.current = {
+          lat: centerLat,
+          lng: centerLng,
+          radius: targetRadius,
+        };
+        loadPOIs(centerLat, centerLng, targetRadius);
+      }, 280);
+    },
+    [filters.radius, manualMode, radius, userLocation?.lat, userLocation?.lng],
+  );
+
   const applyFilters = useCallback(
     async (nextFilters) => {
       const nextRadius = nextFilters.radius ?? 99999;
+      const prevRadius = filters.radius ?? 99999;
       const hasLocation = !!userLocation?.lat && !!userLocation?.lng;
 
       if (!hasLocation || nextRadius >= 99999) {
@@ -2061,12 +2146,14 @@ export default function Kaart() {
         Math.abs(currentContext.lat - userLocation.lat) < 0.0001 &&
         Math.abs(currentContext.lng - userLocation.lng) < 0.0001;
       const maxRadius = sameCenter ? currentContext.maxRadius : 0;
-      const needsFetch = nextRadius > maxRadius;
+      const radiusChanged = nextRadius !== prevRadius;
+      // Filter changes should always sync backing data for that radius, not only when heuristics say so.
+      const needsFetch = radiusChanged || nextRadius > maxRadius;
 
       if (needsFetch) {
         setIsApplyingFilters(true);
         await loadPOIs(userLocation.lat, userLocation.lng, nextRadius, {
-          merge: sameCenter,
+          merge: false,
         });
         setIsApplyingFilters(false);
       }
@@ -2074,7 +2161,7 @@ export default function Kaart() {
       setFilters(nextFilters);
       setShowFilters(false);
     },
-    [radius, userLocation?.lat, userLocation?.lng],
+    [filters.radius, radius, userLocation?.lat, userLocation?.lng],
   );
 
   const filteredPois = useMemo(() => {
@@ -2194,6 +2281,10 @@ export default function Kaart() {
       pendingInNl: inNl,
     };
   }, [loadDebugElapsedMs, poiFetchMeta, userLocation?.lat, userLocation?.lng]);
+  const mapDebugProps = /** @type {any} */ ({
+    debugEnabled: isAdmin && adminLoaderDebug,
+    debugSource: loaderDebugData?.source,
+  });
 
   useEffect(() => {
     if (stage !== "app") return;
@@ -2303,11 +2394,13 @@ export default function Kaart() {
           manualMode={manualMode}
           onLocationSet={handleManualPin}
           pinDropCycle={pinDropCycle}
+          onBoundsChange={handleBoundsChange}
           loadedPoiCount={allPois.length}
           showFilterHint={filterHint}
           onClearFilters={clearVisibilityFilters}
           adminLoaderDebug={adminLoaderDebug}
           setAdminLoaderDebug={setAdminLoaderDebug}
+          debugSource={loaderDebugData?.source}
           favoritePoisForList={favoritePoisForList}
         />
       ) : (
@@ -2324,7 +2417,7 @@ export default function Kaart() {
             pois={filteredPois}
             extraFavoritePois={mapExtraFavoritePois}
             favoriteIds={favorites}
-            onBoundsChange={() => {}}
+            onBoundsChange={handleBoundsChange}
             onSelectPoi={(p) => {
               setSelected(p);
               setSheetExpanded(false);
@@ -2337,6 +2430,7 @@ export default function Kaart() {
             theme={themeState}
             selectedId={selected?.id}
             pinDropCycle={pinDropCycle}
+            {...mapDebugProps}
           />
 
           <TopBar
