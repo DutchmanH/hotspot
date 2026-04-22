@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents, useMap } from 'react-leaflet'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -180,6 +181,25 @@ function FlyTo({ location }) {
 // Default center = Groningen
 const GRONINGEN = [53.2194, 6.5665]
 
+/**
+ * @param {{
+ *   pois?: any[],
+ *   extraFavoritePois?: any[],
+ *   onBoundsChange?: (bounds: any) => void,
+ *   onSelectPoi?: (poi: any) => void,
+ *   mapRef?: any,
+ *   userLocation?: { lat?: number, lng?: number } | null,
+ *   radius?: number,
+ *   manualMode?: boolean,
+ *   onLocationSet?: (location: { lat: number, lng: number }) => void,
+ *   theme?: string,
+ *   selectedId?: string | number,
+ *   pinDropCycle?: number,
+ *   favoriteIds?: any[],
+ *   debugEnabled?: boolean,
+ *   debugSource?: string,
+ * }} props
+ */
 export default function Map({
   pois = [],
   /** POIs in favorites to show on map, not in `pois` (e.g. outside filter) — with lat/lng */
@@ -196,79 +216,141 @@ export default function Map({
   pinDropCycle = 0,
   /** Place ids that are favorites — used for heart on main markers */
   favoriteIds = [],
+  debugEnabled = false,
+  debugSource = 'pending',
 }) {
+  const { t } = useTranslation()
   const favoriteSet = new Set(
     Array.isArray(favoriteIds) ? favoriteIds.map(String) : [],
   )
-  return (
-    <MapContainer
-      center={userLocation?.lat ? [userLocation.lat, userLocation.lng] : GRONINGEN}
-      zoom={13}
-      style={{ height: '100%', width: '100%', cursor: manualMode ? 'crosshair' : 'grab' }}
-      ref={mapRef}
-      zoomControl={false}
-    >
-      {/* CartoDB tiles — remount on theme change to swap tile set */}
-      <TileLayer key={theme} attribution={ATTRIBUTION} url={tileUrl(theme)} />
+  const visiblePoiIdSet = new Set(pois.map((poi) => String(poi.id)))
+  const visiblePoiCoordSet = new Set(
+    pois
+      .filter((poi) => poi.lat != null && poi.lng != null)
+      .map((poi) => `${Number(poi.lat).toFixed(6)},${Number(poi.lng).toFixed(6)}`),
+  )
+  const debugLabelKey
+    = debugSource === 'own' ? 'map.debugTagOwn'
+      : debugSource === 'overpass' ? 'map.debugTagOverpass'
+        : debugSource === 'cache' ? 'map.debugTagCache'
+          : 'map.debugTagPending'
 
-      <BoundsTracker onBoundsChange={onBoundsChange} />
-      <ClickHandler enabled={manualMode} onLocationSet={onLocationSet} />
-      {userLocation?.lat && <FlyTo location={userLocation} />}
+  const debugPillStyle
+    = debugSource === 'own'
+      ? { background: '#0f766e', color: '#ffffff' }
+      : debugSource === 'overpass'
+        ? { background: '#1d4ed8', color: '#ffffff' }
+        : debugSource === 'cache'
+          ? { background: '#4f46e5', color: '#ffffff' }
+          : { background: 'rgba(31, 41, 55, 0.78)', color: '#ffffff' }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <MapContainer
+        center={userLocation?.lat ? [userLocation.lat, userLocation.lng] : GRONINGEN}
+        zoom={13}
+        style={{ height: '100%', width: '100%', cursor: manualMode ? 'crosshair' : 'grab' }}
+        ref={mapRef}
+        zoomControl={false}
+      >
+        {/* CartoDB tiles — remount on theme change to swap tile set */}
+        <TileLayer key={theme} attribution={ATTRIBUTION} url={tileUrl(theme)} />
+
+        <BoundsTracker onBoundsChange={onBoundsChange} />
+        <ClickHandler enabled={manualMode} onLocationSet={onLocationSet} />
+        {userLocation?.lat && <FlyTo location={userLocation} />}
 
       {/* Radius circle */}
-      {userLocation?.lat && radius < 99999 && (
-        <Circle
-          center={[userLocation.lat, userLocation.lng]}
-          radius={radius}
-          pathOptions={{
-            color: 'var(--accent)',
-            fillColor: 'var(--accent)',
-            fillOpacity: 0.06,
-            weight: 1.2,
-            dashArray: '6 4',
-          }}
-        />
-      )}
+        {userLocation?.lat && radius < 99999 && (
+          <Circle
+            center={[userLocation.lat, userLocation.lng]}
+            radius={radius}
+            pathOptions={{
+              color: 'var(--accent)',
+              fillColor: 'var(--accent)',
+              fillOpacity: 0.06,
+              weight: 1.2,
+              dashArray: '6 4',
+            }}
+          />
+        )}
 
       {/* User location */}
-      {userLocation?.lat && (
-        <Marker
-          position={[userLocation.lat, userLocation.lng]}
-          icon={userLocationIcon}
-          zIndexOffset={1000}
-        />
-      )}
+        {userLocation?.lat && (
+          <Marker
+            position={[userLocation.lat, userLocation.lng]}
+            icon={userLocationIcon}
+            zIndexOffset={1000}
+          />
+        )}
 
       {/* POI pins (favorites get a heart badge) */}
-      {pois.map(poi => {
-        const isFav = favoriteSet.has(String(poi.id))
-        const d = Math.min(700, (Math.abs(String(poi.id).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 7) * 90)
-        return (
-          <Marker
-            key={`${poi.id}-${pinDropCycle}`}
-            position={[poi.lat, poi.lng]}
-            icon={createCategoryIcon(
-              poi.category,
-              poi.id === selectedId,
-              d,
-              isFav,
-            )}
-            eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
-            zIndexOffset={poi.id === selectedId ? 500 : (isFav ? 100 : 0)}
-          />
-        )
-      })}
+        {pois.map(poi => {
+          const isFav = favoriteSet.has(String(poi.id))
+          const d = Math.min(700, (Math.abs(String(poi.id).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 7) * 90)
+          return (
+            <Marker
+              key={`${poi.id}-${pinDropCycle}`}
+              position={[poi.lat, poi.lng]}
+              icon={createCategoryIcon(
+                poi.category,
+                poi.id === selectedId,
+                d,
+                isFav,
+              )}
+              eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
+              zIndexOffset={poi.id === selectedId ? 500 : (isFav ? 100 : 0)}
+            />
+          )
+        })}
 
       {/* Favorites with coords, not in the current `pois` list (e.g. filtered out or off-area) */}
-      {extraFavoritePois.map(poi => (
-        <Marker
-          key={`fav-${poi.id}-${pinDropCycle}`}
-          position={[poi.lat, poi.lng]}
-          icon={createHeartOnlyIcon(poi.category)}
-          eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
-          zIndexOffset={poi.id === selectedId ? 450 : 80}
-        />
-      ))}
-    </MapContainer>
+        {extraFavoritePois
+          .filter((poi) => {
+            const id = String(poi.id)
+            const coordKey = `${Number(poi.lat).toFixed(6)},${Number(poi.lng).toFixed(6)}`
+            return !visiblePoiIdSet.has(id) && !visiblePoiCoordSet.has(coordKey)
+          })
+          .map(poi => (
+          <Marker
+            key={`fav-${poi.id}-${pinDropCycle}`}
+            position={[poi.lat, poi.lng]}
+            icon={createHeartOnlyIcon(poi.category)}
+            eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
+            zIndexOffset={poi.id === selectedId ? 450 : 80}
+          />
+        ))}
+      </MapContainer>
+
+      {debugEnabled && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 12,
+            bottom: 12,
+            zIndex: 450,
+            pointerEvents: 'none',
+          }}
+        >
+          <span
+            style={{
+              ...debugPillStyle,
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '4px 10px',
+              borderRadius: 999,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              letterSpacing: '.04em',
+              textTransform: 'uppercase',
+              boxShadow: '0 8px 18px rgba(0,0,0,.28)',
+              border: '1px solid rgba(255,255,255,.25)',
+            }}
+          >
+            {t(debugLabelKey)}
+          </span>
+        </div>
+      )}
+    </div>
   )
 }

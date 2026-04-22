@@ -31,12 +31,20 @@ const COPY = {
 }
 
 const RADIUS_OPTIONS = [
-  { label: '300m', value: 300 },
-  { label: '800m', value: 800 },
+  { label: '300 m', value: 300 },
+  { label: '600 m', value: 600 },
+  { label: '1 km', value: 1000 },
   { label: '2 km', value: 2000 },
+  { label: '3 km', value: 3000 },
   { label: '5 km', value: 5000 },
-  { label: '10 km', value: 10000 },
 ]
+
+const CAT_COLORS = {
+  food: 'oklch(0.72 0.18 30)',
+  outdoor: 'oklch(0.70 0.15 145)',
+  culture: 'oklch(0.70 0.15 300)',
+  activities: 'oklch(0.78 0.17 75)',
+}
 
 function CloseIcon() {
   return (
@@ -82,6 +90,69 @@ function PillRow({ options, value, onChange, multi = false }) {
   )
 }
 
+function CategoryPillRow({ options, value, onChange, allLabel }) {
+  const hasActive = Array.isArray(value) && value.length > 0
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <button
+        onClick={() => onChange('all')}
+        style={{
+          padding: '7px 14px',
+          borderRadius: 'var(--r-pill)',
+          background: !hasActive ? 'var(--ink)' : 'var(--bg)',
+          color: !hasActive ? 'var(--bg)' : 'var(--ink-soft)',
+          border: `1px solid ${!hasActive ? 'var(--ink)' : 'var(--line)'}`,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: 'pointer',
+          transition: 'all .15s',
+        }}
+      >
+        {allLabel}
+      </button>
+      {options.map((opt) => {
+        const color = CAT_COLORS[opt.value] || 'var(--accent)'
+        const active = (value || []).includes(opt.value)
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              padding: '7px 14px 7px 8px',
+              borderRadius: 'var(--r-pill)',
+              background: active ? `color-mix(in oklab, ${color} 18%, var(--bg))` : 'var(--bg)',
+              color: active ? color : 'var(--ink-soft)',
+              border: active
+                ? `1px solid color-mix(in oklab, ${color} 50%, transparent)`
+                : '1px solid var(--line)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all .15s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: color,
+                opacity: active ? 1 : 0.6,
+              }}
+            />
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function Toggle({ label, value, onChange }) {
   return (
     <button
@@ -109,23 +180,52 @@ function Toggle({ label, value, onChange }) {
   )
 }
 
-function Body({ lang, filters, setFilters, onApply, onClose, embedded }) {
+function Body({
+  lang,
+  filters,
+  setFilters,
+  onApply,
+  onClose,
+  embedded,
+  activeCats = [],
+  setActiveCats,
+}) {
   const c = COPY[lang] || COPY.nl
   const [draftFilters, setDraftFilters] = useState(filters)
+  const [draftCats, setDraftCats] = useState(activeCats)
   const [isApplying, setIsApplying] = useState(false)
+  const categoryOptions = Object.entries(c.cats_map).map(([value, label]) => ({ value, label }))
 
   useEffect(() => {
     setDraftFilters(filters)
   }, [filters])
 
+  useEffect(() => {
+    setDraftCats(activeCats)
+  }, [activeCats])
+
+  function toggleDraftCat(catId) {
+    if (catId === 'all') {
+      setDraftCats([])
+      return
+    }
+    setDraftCats((current) =>
+      current.includes(catId)
+        ? current.filter((id) => id !== catId)
+        : [...current, catId],
+    )
+  }
+
   function resetAll() {
-    setDraftFilters({ radius: 10000, price: 'any', openOnly: false, minRating: 0 })
+    setDraftFilters({ radius: 99999, price: 'any', openOnly: false, minRating: 0 })
+    setDraftCats([])
   }
 
   async function applyFilters() {
     if (isApplying) return
     setIsApplying(true)
     try {
+      setActiveCats?.(draftCats)
       if (onApply) {
         await onApply(draftFilters)
       } else {
@@ -167,6 +267,14 @@ function Body({ lang, filters, setFilters, onApply, onClose, embedded }) {
 
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+        {/* Categories */}
+        <SectionLabel>{c.cats}</SectionLabel>
+        <CategoryPillRow
+          options={categoryOptions}
+          value={draftCats}
+          allLabel={c.any}
+          onChange={toggleDraftCat}
+        />
 
         {/* Radius */}
         <SectionLabel>{c.radius}</SectionLabel>

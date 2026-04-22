@@ -921,6 +921,7 @@ function DesktopApp({
   userLocation,
   radius,
   activeCats,
+  setActiveCats,
   onToggleCat,
   favorites,
   onToggleFav,
@@ -1486,7 +1487,7 @@ function DesktopApp({
             setFilters={setFilters}
             onApply={onApplyFilters}
             activeCats={activeCats}
-            onToggleCat={onToggleCat}
+            setActiveCats={setActiveCats}
             onClose={() => setShowFilters(false)}
             embedded
           />
@@ -1849,6 +1850,7 @@ export default function Kaart() {
   const mapRef = useRef(null);
   const requestSeqRef = useRef(0);
   const poiFetchAbortRef = useRef(null);
+  const boundsFetchDebounceRef = useRef(null);
   const fetchedContextRef = useRef(null);
   const loadClockStartRef = useRef(0);
   const isFetchingRef = useRef(false);
@@ -2044,6 +2046,25 @@ export default function Kaart() {
     }
   }
 
+  const resolvePoiDetails = useCallback(
+    (poi) => {
+      if (!poi) return poi;
+      const byId = allPois.find((p) => String(p.id) === String(poi.id));
+      if (byId) return byId;
+      const byCoords = allPois.find(
+        (p) =>
+          p.lat != null &&
+          p.lng != null &&
+          poi.lat != null &&
+          poi.lng != null &&
+          Math.abs(p.lat - poi.lat) < 0.00001 &&
+          Math.abs(p.lng - poi.lng) < 0.00001,
+      );
+      return byCoords || poi;
+    },
+    [allPois],
+  );
+
   function recenter() {
     if (userLocation?.lat) {
       mapRef.current?.flyTo([userLocation.lat, userLocation.lng], 15, {
@@ -2122,7 +2143,7 @@ export default function Kaart() {
   /** All saved favorites for the panel — merged with loaded POIs when available. */
   const favoritePoisForList = useMemo(() => {
     return favoriteEntries.map((e) => {
-      const rich = allPois.find((p) => String(p.id) === e.id);
+      const rich = allPois.find((p) => String(p.id) === String(e.id));
       if (rich) {
         const d =
           userLocation?.lat != null
@@ -2173,7 +2194,7 @@ export default function Kaart() {
           e.lat != null && e.lng != null && !inCurrent.has(String(e.id)),
       )
       .map((e) => {
-        const rich = allPois.find((p) => String(p.id) === e.id);
+        const rich = allPois.find((p) => String(p.id) === String(e.id));
         if (rich) return { ...rich };
         return {
           id: e.id,
@@ -2306,6 +2327,7 @@ export default function Kaart() {
           userLocation={userLocation}
           radius={effectiveRadius}
           activeCats={activeCats}
+          setActiveCats={setActiveCats}
           onToggleCat={toggleCat}
           favorites={favorites}
           mapExtraFavoritePois={mapExtraFavoritePois}
@@ -2358,7 +2380,7 @@ export default function Kaart() {
             favoriteIds={favorites}
             onBoundsChange={handleBoundsChange}
             onSelectPoi={(p) => {
-              setSelected(p);
+              setSelected(resolvePoiDetails(p));
               setSheetExpanded(false);
             }}
             mapRef={mapRef}
@@ -2440,7 +2462,7 @@ export default function Kaart() {
               setFilters={setFilters}
               onApply={applyFilters}
               activeCats={activeCats}
-              onToggleCat={toggleCat}
+              setActiveCats={setActiveCats}
               onClose={() => setShowFilters(false)}
             />
           )}
