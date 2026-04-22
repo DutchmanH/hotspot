@@ -23,3 +23,40 @@ export function evaluateOpenState(tag, at = new Date()) {
     return null;
   }
 }
+
+/**
+ * Return today's closing time (HH:MM) when place is currently open.
+ *
+ * @param {string | undefined | null} tag
+ * @param {Date} [at]
+ * @returns {string | null}
+ */
+export function getTodayClosingTime(tag, at = new Date()) {
+  if (tag == null || typeof tag !== 'string') return null;
+  const trimmed = tag.trim();
+  if (!trimmed) return null;
+
+  try {
+    const oh = new OpeningHours(trimmed, null, {});
+    if (oh.getUnknown(at) || oh.getState(at) !== true) return null;
+
+    const nextChange = oh.getNextChange(at);
+    if (!(nextChange instanceof Date) || Number.isNaN(nextChange.getTime())) {
+      return null;
+    }
+
+    if (
+      nextChange.getFullYear() !== at.getFullYear() ||
+      nextChange.getMonth() !== at.getMonth() ||
+      nextChange.getDate() !== at.getDate()
+    ) {
+      return null;
+    }
+
+    const hh = String(nextChange.getHours()).padStart(2, '0');
+    const mm = String(nextChange.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  } catch {
+    return null;
+  }
+}

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createPortal } from 'react-dom'
+import { getTodayClosingTime } from '../lib/openingHours'
 
 /* ── Translations ─────────────────────────────────────────────── */
 const COPY = {
@@ -12,6 +13,7 @@ const COPY = {
     phone: 'Telefoon', website: 'Website',
     route: 'Route', fav: 'Bewaar', unfav: 'Verwijder',
     walk: (m) => `${m} min lopen`,
+    todayOpenUntil: (t) => `Vandaag open tot ${t}`,
     wheelchair_yes: 'Toegankelijk', wheelchair_no: 'Niet toegankelijk', wheelchair_limited: 'Beperkt toegankelijk',
   },
   en: {
@@ -23,6 +25,7 @@ const COPY = {
     phone: 'Phone', website: 'Website',
     route: 'Route', fav: 'Save', unfav: 'Remove',
     walk: (m) => `${m} min walk`,
+    todayOpenUntil: (t) => `Open until ${t} today`,
     wheelchair_yes: 'Accessible', wheelchair_no: 'Not accessible', wheelchair_limited: 'Limited access',
   },
 }
@@ -30,8 +33,6 @@ const COPY = {
 const CAT_HEX = {
   food: '#d97050', outdoor: '#5a9e60', culture: '#9060c0', activities: '#c8a030',
 }
-
-const HATCH_ANGLES = { food: 45, outdoor: 0, culture: 30, activities: 22 }
 
 /* ── Icons ─────────────────────────────────────────────────────── */
 function CloseIcon() {
@@ -106,6 +107,125 @@ function InfoRow({ icon, children }) {
   )
 }
 
+function CategoryPatternIcon({ category, color }) {
+  const stroke = color
+  if (category === 'food') {
+    return (
+      <g fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="7.2" y1="5.5" x2="7.2" y2="18.5" />
+        <line x1="5.2" y1="7.6" x2="9.2" y2="7.6" />
+        <line x1="16.6" y1="5.5" x2="16.6" y2="18.5" />
+        <path d="M13.8 5.5C17.8 5.5 18 11.1 13.8 11.1" />
+      </g>
+    )
+  }
+  if (category === 'outdoor') {
+    return (
+      <g fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 5.8C8.6 5.8 6 8.3 6 11.5c0 2.8 1.9 5.1 4.6 5.8V18.6h2.8v-1.3c2.6-.7 4.6-3 4.6-5.8 0-3.2-2.6-5.7-6-5.7z" />
+        <line x1="12" y1="9.3" x2="12" y2="18.5" />
+        <path d="M12 11.6c-1.3 0-2.4-.4-3.3-1.1M12 13.5c1.4 0 2.6-.4 3.5-1.2" />
+      </g>
+    )
+  }
+  if (category === 'culture') {
+    return (
+      <g fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5.5 9.2L12 5.8l6.5 3.4" />
+        <line x1="6.4" y1="9.2" x2="17.6" y2="9.2" />
+        <line x1="7.2" y1="10.3" x2="7.2" y2="17.6" />
+        <line x1="12" y1="10.3" x2="12" y2="17.6" />
+        <line x1="16.8" y1="10.3" x2="16.8" y2="17.6" />
+        <line x1="5.8" y1="18.2" x2="18.2" y2="18.2" />
+      </g>
+    )
+  }
+  return (
+    <g fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11.2 5.8L6.2 13.1h4.3l-1 5.1 6.3-8h-4.2l1.3-4.4z" />
+    </g>
+  )
+}
+
+function HeroCategoryPattern({ category, color, poiId }) {
+  const positions = [
+    [28, 22],
+    [96, 18],
+    [162, 24],
+    [232, 20],
+    [54, 70],
+    [126, 74],
+    [202, 68],
+    [28, 106],
+    [96, 102],
+    [164, 108],
+    [234, 104],
+  ]
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 280 120" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+      {positions.map(([x, y], i) => {
+        const start = (i * 0.22).toFixed(2)
+        const dur = `${3.8 + (i % 3) * 0.45}s`
+        const opacity = 0.24 + (i % 2) * 0.08
+        const scale = 0.95 + (i % 3) * 0.08
+        return (
+          <g key={`${poiId}-icon-${i}`} transform={`translate(${x} ${y}) scale(${scale})`} opacity={opacity}>
+            <g transform="translate(-12 -12)">
+              <CategoryPatternIcon category={category} color={color} />
+            </g>
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values={`${x} ${y}; ${x} ${y - 3}; ${x} ${y}`}
+              dur={dur}
+              begin={`${start}s`}
+              repeatCount="indefinite"
+            />
+            <animateTransform
+              attributeName="transform"
+              additive="sum"
+              type="rotate"
+              values={`-2 0 0; 2 0 0; -2 0 0`}
+              dur={`${5.2 + (i % 4) * 0.35}s`}
+              begin={`${start}s`}
+              repeatCount="indefinite"
+            />
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+function formatOpeningHours(rawValue, lang) {
+  if (!rawValue) return []
+  const raw = String(rawValue).trim()
+  if (!raw) return []
+  if (raw === '24/7') {
+    return [lang === 'nl' ? '24 uur per dag geopend' : 'Open 24/7']
+  }
+  const dayMapNl = {
+    Mo: 'Ma',
+    Tu: 'Di',
+    We: 'Wo',
+    Th: 'Do',
+    Fr: 'Vr',
+    Sa: 'Za',
+    Su: 'Zo',
+    PH: 'Feestdag',
+  }
+  return raw
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      if (lang !== 'nl') return part
+      return part
+        .replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, (m) => dayMapNl[m] || m)
+        .replace(/\boff\b/gi, 'gesloten')
+    })
+}
+
 /* ── Body ────────────────────────────────────────────────────────── */
 function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
   const c = COPY[lang] || COPY.nl
@@ -131,8 +251,8 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
   const isFree = !tags.fee || tags.fee === 'no'
   const cuisine = tags.cuisine?.replace(/;/g, ', ')
   const gmUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`
-
-  const hatch = HATCH_ANGLES[poi.category] || 45
+  const openingHoursLines = formatOpeningHours(tags.opening_hours, lang)
+  const todayClosingTime = getTodayClosingTime(tags.opening_hours)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -142,21 +262,16 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
         background: `color-mix(in oklab, ${color} 12%, var(--bg-elev))`,
         flexShrink: 0,
       }}>
-        <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0 }}>
-          <defs>
-            <pattern id={`h-${poi.id}`} patternUnits="userSpaceOnUse" width="10" height="10" patternTransform={`rotate(${hatch})`}>
-              <line x1="0" y1="0" x2="0" y2="10" stroke={color} strokeWidth="3" strokeOpacity=".18"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill={`url(#h-${poi.id})`}/>
-        </svg>
+        <HeroCategoryPattern category={poi.category} color={color} poiId={poi.id} />
         {/* Category badge + close */}
         <div style={{
           position: 'absolute', top: 12, left: 16,
           display: 'flex', alignItems: 'center', gap: 6,
-          background: `color-mix(in oklab, ${color} 22%, var(--bg-elev))`,
-          border: `1px solid ${color}55`,
-          borderRadius: 'var(--r-pill)', padding: '5px 10px',
+          background: 'var(--bg-elev)',
+          border: `1.5px solid ${color}`,
+          borderRadius: 'var(--r-pill)',
+          padding: '5px 10px',
+          boxShadow: '0 2px 8px rgba(0,0,0,.08)',
         }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
           <span style={{ fontSize: 12, fontWeight: 500, color }}>{c.cats[poi.category] || poi.category}</span>
@@ -192,11 +307,11 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
             {open === true && (
               <span style={{
                 padding: '4px 9px', borderRadius: 'var(--r-pill)', fontSize: 11,
-                background: 'oklch(0.70 0.16 145 / .22)', color: 'oklch(0.40 0.16 145)',
-                border: '1px solid oklch(0.70 0.16 145 / .3)', fontWeight: 500,
+                background: 'oklch(0.28 0.08 145)', color: 'oklch(0.94 0.03 145)',
+                border: '1px solid oklch(0.36 0.10 145)', fontWeight: 600,
                 display: 'flex', alignItems: 'center', gap: 5,
               }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.55 0.18 145)' }}/>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.78 0.20 145)' }}/>
                 {c.openNow}
               </span>
             )}
@@ -216,16 +331,54 @@ function Body({ poi, lang, isFavorite, onToggleFav, onClose, embedded }) {
           letterSpacing: '-.015em', color: 'var(--ink)', marginBottom: 6,
         }}>{poi.name || 'Onbekend'}</h2>
         {walk != null && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-faint)', fontSize: 13 }}>
-            <WalkIcon /> {c.walk(walk)}
-          </div>
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-faint)', fontSize: 13 }}>
+              <WalkIcon /> {c.walk(walk)}
+            </div>
+            {todayClosingTime && (
+              <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--ink-soft)' }}>
+                {c.todayOpenUntil(todayClosingTime)}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Info rows */}
       <div style={{ padding: '0 20px' }}>
         <InfoRow icon={<PinIcon />}>{address || null}</InfoRow>
-        <InfoRow icon={<ClockIcon />}>{tags.opening_hours || null}</InfoRow>
+        {openingHoursLines.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              padding: '10px 0',
+              borderBottom: '1px solid var(--line-soft)',
+            }}
+          >
+            <span style={{ color: 'var(--ink-faint)', marginTop: 1, flexShrink: 0 }}>
+              <ClockIcon />
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  letterSpacing: '.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-faint)',
+                }}
+              >
+                {c.hours}
+              </span>
+              {openingHoursLines.map((line) => (
+                <span key={line} style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--ink)' }}>
+                  {line}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {cuisine && <InfoRow icon={<span style={{ fontSize: 12 }}>🍽</span>}>{cuisine}</InfoRow>}
         {phone && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--line-soft)' }}>

@@ -2065,6 +2065,89 @@ export default function Kaart() {
     [allPois],
   );
 
+  const hasRichPoiDetails = useCallback((poi) => {
+    if (!poi) return false;
+    const tags = poi.tags || {};
+    return Boolean(
+      tags.opening_hours ||
+      tags.phone ||
+      tags["contact:phone"] ||
+      tags.website ||
+      tags["contact:website"] ||
+      tags["addr:street"] ||
+      tags["addr:city"] ||
+      tags.cuisine,
+    );
+  }, []);
+
+  const selectPoi = useCallback(
+    (poi) => {
+      if (!poi) {
+        setSelected(null);
+        return;
+      }
+      const basePoi = resolvePoiDetails(poi);
+      setSelected(basePoi);
+
+      if (
+        hasRichPoiDetails(basePoi) ||
+        basePoi.lat == null ||
+        basePoi.lng == null
+      ) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const { pois: nearbyPois } = await fetchAllPOIs(
+            basePoi.lat,
+            basePoi.lng,
+            0.6,
+            undefined,
+          );
+          if (!nearbyPois?.length) return;
+
+          const enriched =
+            nearbyPois.find((p) => String(p.id) === String(basePoi.id)) ||
+            nearbyPois.find(
+              (p) =>
+                Math.abs((p.lat || 0) - (basePoi.lat || 0)) < 0.00008 &&
+                Math.abs((p.lng || 0) - (basePoi.lng || 0)) < 0.00008,
+            );
+          if (!enriched) return;
+
+          const enrichedWithMeta = {
+            ...enriched,
+            _dist:
+              userLocation?.lat != null
+                ? calcDistance(
+                    userLocation.lat,
+                    userLocation.lng,
+                    enriched.lat,
+                    enriched.lng,
+                  )
+                : basePoi._dist,
+            _open: evaluateOpenState(enriched.tags?.opening_hours),
+          };
+
+          setSelected((current) => {
+            if (!current) return current;
+            const samePoi =
+              String(current.id) === String(basePoi.id) ||
+              (current.lat != null &&
+                current.lng != null &&
+                Math.abs(current.lat - (basePoi.lat || 0)) < 0.00008 &&
+                Math.abs(current.lng - (basePoi.lng || 0)) < 0.00008);
+            return samePoi ? enrichedWithMeta : current;
+          });
+        } catch {
+          // Best effort enrichment for favorite-only pins.
+        }
+      })();
+    },
+    [hasRichPoiDetails, resolvePoiDetails, userLocation?.lat, userLocation?.lng],
+  );
+
   function recenter() {
     if (userLocation?.lat) {
       mapRef.current?.flyTo([userLocation.lat, userLocation.lng], 15, {
@@ -2336,7 +2419,7 @@ export default function Kaart() {
           setFilters={setFilters}
           onApplyFilters={applyFilters}
           selected={selected}
-          setSelected={setSelected}
+          setSelected={selectPoi}
           showFilters={showFilters}
           setShowFilters={setShowFilters}
           showFavs={showFavs}
@@ -2380,7 +2463,7 @@ export default function Kaart() {
             favoriteIds={favorites}
             onBoundsChange={handleBoundsChange}
             onSelectPoi={(p) => {
-              setSelected(resolvePoiDetails(p));
+              selectPoi(p);
               setSheetExpanded(false);
             }}
             mapRef={mapRef}
@@ -2421,7 +2504,7 @@ export default function Kaart() {
             favorites={favorites}
             onToggleFav={toggleFav}
             onPickPoi={(p) => {
-              setSelected(p);
+              selectPoi(p);
               setSheetExpanded(false);
             }}
             expanded={sheetExpanded}
@@ -2438,7 +2521,7 @@ export default function Kaart() {
               lang={lang}
               isFavorite={() => isFavorite(selected.id)}
               onToggleFav={() => toggleFav(selected)}
-              onClose={() => setSelected(null)}
+              onClose={() => selectPoi(null)}
             />
           )}
 
@@ -2449,7 +2532,7 @@ export default function Kaart() {
               onClose={() => setShowFavs(false)}
               onPickPoi={(p) => {
                 setShowFavs(false);
-                setSelected(p);
+                selectPoi(p);
               }}
               onToggleFav={toggleFav}
             />
