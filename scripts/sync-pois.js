@@ -24,26 +24,29 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
 
+// Bounding box van Nederland (south,west,north,east)
+const NL_BBOX = '50.5,3.3,53.7,7.3'
+
 // Overpass queries per categorie — gespiegeld aan src/lib/overpass.js
 const CATEGORY_QUERIES = {
   food: `
-    node["amenity"~"restaurant|cafe|bar|fast_food"](area.nl);
-    way["amenity"~"restaurant|cafe|bar|fast_food"](area.nl);
+    node["amenity"~"restaurant|cafe|bar|fast_food"](${NL_BBOX});
+    way["amenity"~"restaurant|cafe|bar|fast_food"](${NL_BBOX});
   `,
   outdoor: `
-    node["leisure"~"park|nature_reserve"](area.nl);
-    node["tourism"~"viewpoint|picnic_site"](area.nl);
-    way["leisure"~"park|nature_reserve"](area.nl);
+    node["leisure"~"park|nature_reserve"](${NL_BBOX});
+    node["tourism"~"viewpoint|picnic_site"](${NL_BBOX});
+    way["leisure"~"park|nature_reserve"](${NL_BBOX});
   `,
   culture: `
-    node["tourism"~"museum|gallery"](area.nl);
-    node["amenity"~"theatre|cinema"](area.nl);
-    node["historic"](area.nl);
-    way["tourism"~"museum|gallery"](area.nl);
+    node["tourism"~"museum|gallery"](${NL_BBOX});
+    node["amenity"~"theatre|cinema"](${NL_BBOX});
+    node["historic"](${NL_BBOX});
+    way["tourism"~"museum|gallery"](${NL_BBOX});
   `,
   activities: `
-    node["leisure"~"sports_centre|bowling_alley|escape_game|miniature_golf"](area.nl);
-    way["leisure"~"sports_centre|bowling_alley|escape_game|miniature_golf"](area.nl);
+    node["leisure"~"sports_centre|bowling_alley|escape_game|miniature_golf"](${NL_BBOX});
+    way["leisure"~"sports_centre|bowling_alley|escape_game|miniature_golf"](${NL_BBOX});
   `,
 }
 
@@ -96,12 +99,7 @@ function getSubcategory(tags) {
 }
 
 async function fetchOverpassCategory(category, inner) {
-  const query = `[out:json][timeout:300];
-area["ISO3166-1"="NL"][admin_level=2]->.nl;
-(
-${inner}
-);
-out center;`
+  const query = `[out:json][timeout:300];(${inner});out center;`
 
   console.log(`  → Overpass query voor categorie: ${category}`)
 
