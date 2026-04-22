@@ -1,21 +1,72 @@
-import { useState, useEffect, useCallback } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect -- sync favorites from localStorage/Supabase when auth is known */
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 const LS_KEY = 'hotspot_fav_ids'
 
-function loadLocal() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
+/** @typedef {{ id: string, lat?: number, lng?: number, name?: string, category?: string }} FavoriteEntry */
+
+/** @param {unknown} raw */
+function normalizeLocal(raw) {
+  try {
+    if (!Array.isArray(raw) || raw.length === 0) return []
+    if (typeof raw[0] === 'string') {
+      return raw.map((id) => ({ id: String(id) }))
+    }
+    return raw
+      .filter((x) => x && typeof x === 'object' && x.id != null)
+      .map((x) => ({
+        id: String(x.id),
+        lat: typeof x.lat === 'number' ? x.lat : undefined,
+        lng: typeof x.lng === 'number' ? x.lng : undefined,
+        name: x.name,
+        category: x.category,
+      }))
+  } catch {
+    return []
+  }
 }
-function saveLocal(ids) {
-  localStorage.setItem(LS_KEY, JSON.stringify(ids))
+
+function loadLocal() {
+  try {
+    return normalizeLocal(JSON.parse(localStorage.getItem(LS_KEY) || '[]'))
+  } catch {
+    return []
+  }
+}
+
+/** @param {FavoriteEntry[]} entries */
+function saveLocal(entries) {
+  localStorage.setItem(LS_KEY, JSON.stringify(entries))
 }
 
 export function useFavorites() {
-  // Array of place_id strings (OSM ids)
-  const [favorites, setFavorites] = useState([])
-  const [userId, setUserId]       = useState(undefined) // undefined = not yet determined
+  const [favoriteEntries, setFavoriteEntries] = useState(/** @type {FavoriteEntry[]} */ ([]))
+  const [userId, setUserId] = useState(undefined)
 
-  /* ── Track auth state ─────────────────────────────────────── */
+  const favorites = useMemo(
+    () => favoriteEntries.map((e) => e.id),
+    [favoriteEntries],
+  )
+
+  const loadSupabase = useCallback(async (uid) => {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('place_id, latitude, longitude, place_name, category')
+      .eq('user_id', uid)
+    if (!error && data) {
+      setFavoriteEntries(
+        data.map((r) => ({
+          id: String(r.place_id),
+          lat: r.latitude == null ? undefined : Number(r.latitude),
+          lng: r.longitude == null ? undefined : Number(r.longitude),
+          name: r.place_name,
+          category: r.category,
+        })),
+      )
+    }
+  }, [])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id ?? null)
@@ -26,64 +77,105 @@ export function useFavorites() {
     return () => subscription.unsubscribe()
   }, [])
 
-  /* ── Load favorites when auth state resolves ──────────────── */
   useEffect(() => {
-    if (userId === undefined) return // still loading
+    if (userId === undefined) return
     if (userId) {
-      loadSupabase(userId)
+      void loadSupabase(userId)
     } else {
-      setFavorites(loadLocal())
+      setFavoriteEntries(loadLocal())
     }
-  }, [userId])
+  }, [userId, loadSupabase])
 
-  async function loadSupabase(uid) {
-    const { data, error } = await supabase
-      .from('favorites')
-      .select('place_id')
-      .eq('user_id', uid)
-    if (!error && data) {
-      setFavorites(data.map(r => r.place_id))
-    }
-  }
-
-  /* ── Add ──────────────────────────────────────────────────── */
-  const addFavorite = useCallback(async (poi) => {
-    setFavorites(prev => prev.includes(poi.id) ? prev : [...prev, poi.id])
-
-    if (userId) {
-      await supabase.from('favorites').upsert({
-        user_id:    userId,
-        place_id:   poi.id,
-        place_name: poi.name || poi.tags?.name || poi.id,
-        category:   poi.category,
-        latitude:   poi.lat,
-        longitude:  poi.lng,
-        session_id: 'user',
-      }, { onConflict: 'user_id,place_id', ignoreDuplicates: true })
-    } else {
-      setFavorites(prev => {
-        const next = prev.includes(poi.id) ? prev : [...prev, poi.id]
-        saveLocal(next)
+  const addFavorite = useCallback(
+    async (poi) => {
+      const entry = {
+        id: String(poi.id),
+        lat: poi.lat,
+        lng: poi.lng,
+        name: poi.name || poi.tags?.name,
+        category: poi.category,
+      }
+      setFavoriteEntries((prev) => {
+        if (prev.some((e) => e.id === entry.id)) return prev
+        const next = [...prev, entry]
+        if (!userId) saveLocal(next)
         return next
       })
-    }
-  }, [userId])
 
-  /* ── Remove ───────────────────────────────────────────────── */
-  const removeFavorite = useCallback(async (id) => {
-    setFavorites(prev => {
-      const next = prev.filter(f => f !== id)
-      if (!userId) saveLocal(next)
-      return next
-    })
-    if (userId) {
-      await supabase.from('favorites').delete()
-        .eq('user_id', userId)
-        .eq('place_id', id)
-    }
-  }, [userId])
+      if (userId) {
+        await supabase.from('favorites').upsert(
+          {
+            user_id: userId,
+            place_id: entry.id,
+            place_name: entry.name || entry.id,
+            category: entry.category,
+            latitude: entry.lat,
+            longitude: entry.lng,
+            session_id: 'user',
+          },
+          { onConflict: 'user_id,place_id', ignoreDuplicates: true },
+        )
+      }
+    },
+    [userId],
+  )
 
-  const isFavorite = useCallback((id) => favorites.includes(id), [favorites])
+  const removeFavorite = useCallback(
+    async (id) => {
+      const sid = String(id)
+      setFavoriteEntries((prev) => {
+        const next = prev.filter((e) => e.id !== sid)
+        if (!userId) saveLocal(next)
+        return next
+      })
+      if (userId) {
+        await supabase.from('favorites').delete().eq('user_id', userId).eq('place_id', sid)
+      }
+    },
+    [userId],
+  )
 
-  return { favorites, addFavorite, removeFavorite, isFavorite }
+  const isFavorite = useCallback(
+    (id) => favoriteEntries.some((e) => e.id === String(id)),
+    [favoriteEntries],
+  )
+
+  /**
+   * Fill missing coordinates from currently loaded POIs (e.g. legacy favs with id-only).
+   * Persists to localStorage for anonymous users when entries change.
+   */
+  const mergeCoordsFromPois = useCallback(
+    (pois) => {
+      if (!Array.isArray(pois) || pois.length === 0) return
+      setFavoriteEntries((prev) => {
+        let changed = false
+        const next = prev.map((e) => {
+          if (e.lat != null && e.lng != null) return e
+          const p = pois.find((x) => String(x.id) === e.id)
+          if (!p) return e
+          changed = true
+          return {
+            ...e,
+            lat: p.lat,
+            lng: p.lng,
+            name: e.name || p.name,
+            category: e.category || p.category,
+          }
+        })
+        if (!changed) return prev
+        if (!userId) saveLocal(next)
+        return next
+      })
+    },
+    [userId],
+  )
+
+  return {
+    favorites,
+    favoriteEntries,
+    addFavorite,
+    removeFavorite,
+    isFavorite,
+    mergeCoordsFromPois,
+  }
 }

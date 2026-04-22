@@ -4,7 +4,7 @@ const OVERPASS_URL = '/api/overpass'
 
 // Bounding box van Nederland — POIs binnen dit gebied komen uit Supabase
 const NL_BOUNDS = { minLat: 50.5, maxLat: 53.7, minLng: 3.3, maxLng: 7.3 }
-function isInNetherlands(lat, lng) {
+export function isInNetherlands(lat, lng) {
   return lat >= NL_BOUNDS.minLat && lat <= NL_BOUNDS.maxLat
       && lng >= NL_BOUNDS.minLng && lng <= NL_BOUNDS.maxLng
 }
@@ -322,6 +322,16 @@ export async function fetchPOIs(category, bounds) {
  * @param {number} lng
  * @param {number} radiusKm
  * @param {AbortSignal} signal — verplicht; annuleer vorige call vanuit de aanroeper
+ * @returns {Promise<{ pois: Array, meta: {
+ *   dataSource: 'client-cache' | 'supabase' | 'overpass',
+ *   requestTarget: string,
+ *   inNetherlands: boolean,
+ *   durationMs: number,
+ *   supabaseQueryMs?: number,
+ *   overpassQueryMs?: number,
+ *   nextAfterFetch: string,
+ *   stepLog: string[],
+ * } }>}
  */
 export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
   if (!signal) {
@@ -331,31 +341,68 @@ export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
     throw new DOMException('Aborted', 'AbortError')
   }
 
+  const t0 = performance.now()
+  const inNL = isInNetherlands(lat, lng)
+  const stepLog = []
+  const nextAfterFetch = 'Enrich: distance, opening hours, sort — then map'
+
   const cached = readPoiCache(lat, lng, radiusKm)
   if (cached) {
     if (signal.aborted) {
       throw new DOMException('Aborted', 'AbortError')
     }
-    return cached.map((p) => ({
-      ...p,
-      tags: { ...p.tags },
-    }))
+    const durationMs = Math.round(performance.now() - t0)
+    return {
+      pois: cached.map((p) => ({
+        ...p,
+        tags: { ...p.tags },
+      })),
+      meta: {
+        dataSource: 'client-cache',
+        requestTarget: 'In-memory client POI cache (5 min TTL, same 4dp center + km)',
+        inNetherlands: inNL,
+        durationMs,
+        nextAfterFetch,
+        stepLog: ['Client cache HIT — skip network'],
+      },
+    }
   }
 
+  stepLog.push('Client cache MISS')
+
   // Gebruik Supabase cache voor locaties in Nederland
-  if (isInNetherlands(lat, lng)) {
+  if (inNL) {
     try {
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+      const tSb = performance.now()
       const supabasePois = await fetchPOIsFromSupabase(lat, lng, radiusKm)
+      const supabaseQueryMs = Math.round(performance.now() - tSb)
       if (supabasePois.length > 0) {
         writePoiCache(lat, lng, radiusKm, supabasePois)
-        return supabasePois.map((p) => ({ ...p, tags: { ...p.tags } }))
+        const durationMs = Math.round(performance.now() - t0)
+        stepLog.push(`Supabase RPC get_pois_near — ${supabaseQueryMs}ms — ${supabasePois.length} pois`)
+        return {
+          pois: supabasePois.map((p) => ({ ...p, tags: { ...p.tags } })),
+          meta: {
+            dataSource: 'supabase',
+            requestTarget: 'Supabase RPC: get_pois_near',
+            inNetherlands: true,
+            durationMs,
+            supabaseQueryMs,
+            nextAfterFetch,
+            stepLog,
+          },
+        }
       }
+      stepLog.push(`Supabase: 0 rows (${supabaseQueryMs}ms) — fallback Overpass`)
     } catch (err) {
       if (err.name === 'AbortError') throw err
       // Supabase niet beschikbaar of leeg — fallback naar Overpass
       console.warn('Supabase POI cache niet beschikbaar, val terug op Overpass:', err.message)
+      stepLog.push(`Supabase error: ${err.message} — fallback Overpass`)
     }
+  } else {
+    stepLog.push('Outside NL bounds — direct Overpass (no Supabase cache)')
   }
 
   const bbox = boundsFromRadius(lat, lng, radiusKm)
@@ -364,7 +411,10 @@ export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
     .join('')
   const query = `[out:json][timeout:45];(${inner});out center 200;`
 
+  const tOv = performance.now()
   const data = await fetchOverpass(query, 0, signal)
+  const overpassQueryMs = Math.round(performance.now() - tOv)
+  stepLog.push(`Overpass: POST ${OVERPASS_URL} — ${overpassQueryMs}ms`)
 
   const parsed = data.elements
     .filter(el => el.lat || el.center)
@@ -388,8 +438,20 @@ export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
     })
 
   writePoiCache(lat, lng, radiusKm, parsed)
-  return parsed.map((p) => ({
-    ...p,
-    tags: { ...p.tags },
-  }))
+  const durationMs = Math.round(performance.now() - t0)
+  return {
+    pois: parsed.map((p) => ({
+      ...p,
+      tags: { ...p.tags },
+    })),
+    meta: {
+      dataSource: 'overpass',
+      requestTarget: `POST ${OVERPASS_URL} (all categories, radius bbox)`,
+      inNetherlands: inNL,
+      durationMs,
+      overpassQueryMs,
+      nextAfterFetch,
+      stepLog,
+    },
+  }
 }

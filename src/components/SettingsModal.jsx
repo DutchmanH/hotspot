@@ -6,6 +6,8 @@ const COPY = {
     title: 'Instellingen',
     theme: 'Weergave', themeLight: 'Licht', themeDark: 'Donker',
     lang: 'Taal',
+    loaderDebug: 'Loader debug (admin)',
+    loaderDebugHint: 'Toon extra laadinfo in overlay',
     admin: 'Inloggen',
     version: 'Hotspot v1.0',
   },
@@ -13,6 +15,8 @@ const COPY = {
     title: 'Settings',
     theme: 'Appearance', themeLight: 'Light', themeDark: 'Dark',
     lang: 'Language',
+    loaderDebug: 'Loader debug (admin)',
+    loaderDebugHint: 'Show extra loading details in overlay',
     admin: 'Login',
     version: 'Hotspot v1.0',
   },
@@ -73,7 +77,20 @@ function SegmentedControl({ options, value, onChange }) {
   )
 }
 
-function Body({ lang, setLang, theme, setTheme, onClose, onOpenAdmin, adminLabel, user, embedded }) {
+function Body({
+  lang,
+  setLang,
+  theme,
+  setTheme,
+  onClose,
+  onOpenAdmin,
+  adminLabel,
+  user,
+  isAdmin,
+  adminLoaderDebug,
+  setAdminLoaderDebug,
+  embedded,
+}) {
   const c = COPY[lang] || COPY.nl
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || ''
 
@@ -129,6 +146,42 @@ function Body({ lang, setLang, theme, setTheme, onClose, onOpenAdmin, adminLabel
             ]}
           />
         </div>
+
+        {isAdmin && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--line-soft)', gap: 12 }}>
+            <div>
+              <p style={{ fontSize: 14, color: 'var(--ink)', margin: 0 }}>{c.loaderDebug}</p>
+              <p style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 2 }}>{c.loaderDebugHint}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminLoaderDebug?.((v) => !v)}
+              style={{
+                width: 44,
+                height: 24,
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: adminLoaderDebug ? 'var(--accent)' : 'var(--line)',
+                position: 'relative',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  left: adminLoaderDebug ? 22 : 2,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  transition: 'left .2s ease',
+                }}
+              />
+            </button>
+          </div>
+        )}
 
         {/* Version */}
         <div style={{ padding: '16px 0', borderBottom: '1px solid var(--line-soft)' }}>

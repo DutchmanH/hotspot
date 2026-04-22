@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Map from "../components/Map";
 import Landing from "./Landing";
@@ -12,7 +13,7 @@ import AuthModal from "../components/AuthModal";
 import { useFavorites } from "../hooks/useFavorites";
 import { useTheme } from "../hooks/useTheme";
 import { evaluateOpenState } from "../lib/openingHours";
-import { fetchAllPOIs } from "../lib/overpass";
+import { fetchAllPOIs, isInNetherlands } from "../lib/overpass";
 import { initSession } from "../lib/session";
 import { useAuth } from "../context/AuthContext";
 
@@ -414,50 +415,6 @@ function CategoryBar({ lang, activeCats, onToggle }) {
           })}
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Non-blocking refresh hint (map blijft zichtbaar) ───────────────────────
-function MapRefreshBanner({ lang, visible }) {
-  const t = COPY[lang];
-  if (!visible) return null;
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 12,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 35,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 16px",
-        borderRadius: "var(--r-pill)",
-        background: "var(--bg-elev)",
-        border: "1px solid var(--line-soft)",
-        boxShadow: "var(--shadow-pop)",
-        fontFamily: "var(--font-sans)",
-        fontSize: 13,
-        fontWeight: 500,
-        color: "var(--ink)",
-        pointerEvents: "none",
-        maxWidth: "min(92vw, 360px)",
-      }}
-    >
-      <span
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          border: "2px solid color-mix(in oklab, var(--ink) 18%, transparent)",
-          borderTopColor: "var(--accent)",
-          flexShrink: 0,
-          animation: "spin .75s linear infinite",
-        }}
-      />
-      <span style={{ textAlign: "center", lineHeight: 1.25 }}>{t.refreshBanner}</span>
     </div>
   );
 }
@@ -969,6 +926,7 @@ function DesktopApp({
   onToggleFav,
   filters,
   setFilters,
+  onApplyFilters,
   selected,
   setSelected,
   showFilters,
@@ -992,7 +950,10 @@ function DesktopApp({
   loadedPoiCount,
   showFilterHint,
   onClearFilters,
-  refreshing,
+  adminLoaderDebug,
+  setAdminLoaderDebug,
+  mapExtraFavoritePois = [],
+  favoritePoisForList = [],
 }) {
   const t = COPY[lang];
 
@@ -1459,9 +1420,10 @@ function DesktopApp({
 
         {/* Right: map */}
         <div style={{ position: "relative", overflow: "hidden" }}>
-          <MapRefreshBanner lang={lang} visible={refreshing} />
           <Map
             pois={pois}
+            extraFavoritePois={mapExtraFavoritePois}
+            favoriteIds={favorites}
             onBoundsChange={() => {}}
             onSelectPoi={setSelected}
             mapRef={mapRef}
@@ -1515,6 +1477,7 @@ function DesktopApp({
             lang={lang}
             filters={filters}
             setFilters={setFilters}
+            onApply={onApplyFilters}
             activeCats={activeCats}
             onToggleCat={onToggleCat}
             onClose={() => setShowFilters(false)}
@@ -1526,7 +1489,7 @@ function DesktopApp({
         <DtModal width={560} onClose={() => setShowFavs(false)}>
           <FavoritesPanel
             lang={lang}
-            favorites={favorites}
+            favorites={favoritePoisForList}
             onClose={() => setShowFavs(false)}
             onPickPoi={(poi) => {
               setShowFavs(false);
@@ -1545,6 +1508,9 @@ function DesktopApp({
             theme={theme}
             setTheme={setTheme}
             user={user}
+            isAdmin={isAdmin}
+            adminLoaderDebug={adminLoaderDebug}
+            setAdminLoaderDebug={setAdminLoaderDebug}
             onClose={() => setShowSettings(false)}
             onOpenAdmin={() => {
               setShowSettings(false);
@@ -1807,7 +1773,14 @@ export default function Kaart() {
   const { theme, toggleTheme } = useTheme();
   const { user, isAdmin } = useAuth();
   const [themeState, setThemeState] = useState(theme);
-  const { addFavorite, removeFavorite, isFavorite } = useFavorites();
+  const {
+    addFavorite,
+    removeFavorite,
+    isFavorite,
+    favorites,
+    favoriteEntries,
+    mergeCoordsFromPois,
+  } = useFavorites();
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
 
@@ -1856,10 +1829,21 @@ export default function Kaart() {
   const [manualMode, setManualMode] = useState(false);
   const [pinDropCycle, setPinDropCycle] = useState(0);
   const [lastSearch, setLastSearch] = useState(null);
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  const [adminLoaderDebug, setAdminLoaderDebug] = useState(
+    () => localStorage.getItem("hotspot_admin_loader_debug") === "1",
+  );
+  /** Last completed fetch; drives admin loader debug (source, timing, steps). */
+  const [poiFetchMeta, setPoiFetchMeta] = useState(null);
+  /** 'fetch' | 'enrich' | 'idle' — client pipeline after network returns. */
+  const [loadPipelinePhase, setLoadPipelinePhase] = useState("idle");
+  const [loadDebugElapsedMs, setLoadDebugElapsedMs] = useState(0);
 
   const mapRef = useRef(null);
   const requestSeqRef = useRef(0);
   const poiFetchAbortRef = useRef(null);
+  const fetchedContextRef = useRef(null);
+  const loadClockStartRef = useRef(0);
 
   const clearVisibilityFilters = useCallback(() => {
     setActiveCats([]);
@@ -1874,6 +1858,25 @@ export default function Kaart() {
   useEffect(() => {
     initSession();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("hotspot_admin_loader_debug", adminLoaderDebug ? "1" : "0");
+  }, [adminLoaderDebug]);
+
+  /** Live elapsed for admin loader debug only (drives re-renders while overlay is up). */
+  useEffect(() => {
+    if (!isAdmin || !adminLoaderDebug) return undefined;
+    if (!loading && !isApplyingFilters) return undefined;
+    if (loadError) return undefined;
+    const id = setInterval(() => {
+      setLoadDebugElapsedMs(
+        Math.round(performance.now() - loadClockStartRef.current),
+      );
+    }, 100);
+    return () => {
+      clearInterval(id);
+    };
+  }, [isAdmin, adminLoaderDebug, loading, isApplyingFilters, loadError]);
 
   useEffect(() => {
     if (isDesktop || stage === "landing") return undefined;
@@ -1900,7 +1903,8 @@ export default function Kaart() {
     localStorage.setItem("hotspot_theme", t);
   };
 
-  const loadPOIs = async (lat, lng, r) => {
+  const loadPOIs = async (lat, lng, r, options = {}) => {
+    const { merge = false, onSettled } = options;
     const reqId = ++requestSeqRef.current;
     poiFetchAbortRef.current?.abort();
     const ac = new AbortController();
@@ -1908,14 +1912,34 @@ export default function Kaart() {
 
     setLastSearch({ lat, lng, r });
     setLoadError(null);
+    loadClockStartRef.current = performance.now();
+    setLoadDebugElapsedMs(0);
+    setPoiFetchMeta(null);
+    setLoadPipelinePhase("fetch");
     setLoading(true);
     try {
-      const raw = await fetchAllPOIs(lat, lng, r / 1000, ac.signal);
+      const { pois: raw, meta: fetchMeta } = await fetchAllPOIs(
+        lat,
+        lng,
+        r / 1000,
+        ac.signal,
+      );
       if (reqId !== requestSeqRef.current) return;
 
+      // Force a paint with the real data source before enrich; otherwise React
+      // batches meta + setLoading(false) and the overlay never shows DB/Overpass.
+      flushSync(() => {
+        setPoiFetchMeta(fetchMeta ?? null);
+        setLoadPipelinePhase("enrich");
+      });
+
       if (!raw?.length) {
-        setAllPois([]);
-        setLoadError({ code: "general" });
+        if (!merge) {
+          setAllPois([]);
+          setLoadError({ code: "general" });
+          return;
+        }
+        fetchedContextRef.current = { lat, lng, maxRadius: r };
         return;
       }
 
@@ -1927,17 +1951,31 @@ export default function Kaart() {
           _open: evaluateOpenState(p.tags?.opening_hours),
         }))
         .sort((a, b) => a._dist - b._dist);
-      setAllPois(enriched);
+      if (!merge) {
+        setAllPois(enriched);
+      } else {
+        setAllPois((prev) => {
+          const mergedById = new globalThis.Map();
+          prev.forEach((poi) => mergedById.set(poi.id, poi));
+          enriched.forEach((poi) => mergedById.set(poi.id, poi));
+          return Array.from(mergedById.values()).sort((a, b) => a._dist - b._dist);
+        });
+      }
+      fetchedContextRef.current = { lat, lng, maxRadius: r };
     } catch (err) {
       if (reqId !== requestSeqRef.current) return;
       if (err?.name === "AbortError") return;
-      setAllPois([]);
+      setPoiFetchMeta(null);
+      if (!merge) setAllPois([]);
       const code = err?.code === "rateLimited" || err?.code === "timeout" ? err.code : "general";
       setLoadError({ code });
     } finally {
       if (reqId === requestSeqRef.current) {
+        setLoadPipelinePhase("idle");
+        loadClockStartRef.current = 0;
         setLoading(false);
         setPinDropCycle((c) => c + 1);
+        onSettled?.();
       }
     }
   };
@@ -1963,7 +2001,8 @@ export default function Kaart() {
   function handleManualPin(loc) {
     setUserLocation({ lat: loc.lat, lng: loc.lng });
     setManualMode(false);
-    loadPOIs(loc.lat, loc.lng, radius);
+    const targetRadius = filters.radius < 99999 ? filters.radius : radius;
+    loadPOIs(loc.lat, loc.lng, targetRadius);
   }
 
   function toggleCat(id) {
@@ -2000,11 +2039,43 @@ export default function Kaart() {
       return;
     }
     if (userLocation?.lat && userLocation?.lng) {
-      loadPOIs(userLocation.lat, userLocation.lng, radius);
+      const targetRadius = filters.radius < 99999 ? filters.radius : radius;
+      loadPOIs(userLocation.lat, userLocation.lng, targetRadius);
     }
   }
 
-  const favoritePois = allPois.filter((p) => isFavorite(p.id));
+  const applyFilters = useCallback(
+    async (nextFilters) => {
+      const nextRadius = nextFilters.radius ?? 99999;
+      const hasLocation = !!userLocation?.lat && !!userLocation?.lng;
+
+      if (!hasLocation || nextRadius >= 99999) {
+        setFilters(nextFilters);
+        setShowFilters(false);
+        return;
+      }
+
+      const currentContext = fetchedContextRef.current;
+      const sameCenter =
+        currentContext &&
+        Math.abs(currentContext.lat - userLocation.lat) < 0.0001 &&
+        Math.abs(currentContext.lng - userLocation.lng) < 0.0001;
+      const maxRadius = sameCenter ? currentContext.maxRadius : 0;
+      const needsFetch = nextRadius > maxRadius;
+
+      if (needsFetch) {
+        setIsApplyingFilters(true);
+        await loadPOIs(userLocation.lat, userLocation.lng, nextRadius, {
+          merge: sameCenter,
+        });
+        setIsApplyingFilters(false);
+      }
+
+      setFilters(nextFilters);
+      setShowFilters(false);
+    },
+    [radius, userLocation?.lat, userLocation?.lng],
+  );
 
   const filteredPois = useMemo(() => {
     let list = allPois;
@@ -2018,6 +2089,77 @@ export default function Kaart() {
     return list;
   }, [allPois, activeCats, filters]);
 
+  useEffect(() => {
+    if (allPois.length) mergeCoordsFromPois(allPois);
+  }, [allPois, mergeCoordsFromPois]);
+
+  /** All saved favorites for the panel — merged with loaded POIs when available. */
+  const favoritePoisForList = useMemo(() => {
+    return favoriteEntries.map((e) => {
+      const rich = allPois.find((p) => String(p.id) === e.id);
+      if (rich) {
+        const d =
+          userLocation?.lat != null
+            ? calcDistance(
+                userLocation.lat,
+                userLocation.lng,
+                rich.lat,
+                rich.lng,
+              )
+            : rich._dist;
+        return { ...rich, _dist: d };
+      }
+      if (e.lat == null || e.lng == null) {
+        return {
+          id: e.id,
+          lat: 0,
+          lng: 0,
+          name: e.name || e.id,
+          category: e.category || "activities",
+          tags: {},
+          _dist: undefined,
+        };
+      }
+      const d =
+        userLocation?.lat != null
+          ? calcDistance(userLocation.lat, userLocation.lng, e.lat, e.lng)
+          : undefined;
+      return {
+        id: e.id,
+        lat: e.lat,
+        lng: e.lng,
+        name: e.name || e.id,
+        category: e.category || "activities",
+        tags: {},
+        _dist: d,
+      };
+    });
+  }, [favoriteEntries, allPois, userLocation]);
+
+  /**
+   * Favorites with valid coords that are not in the current filtered set — show as heart-only on map.
+   */
+  const mapExtraFavoritePois = useMemo(() => {
+    const inCurrent = new Set(filteredPois.map((p) => String(p.id)));
+    return favoriteEntries
+      .filter(
+        (e) =>
+          e.lat != null && e.lng != null && !inCurrent.has(String(e.id)),
+      )
+      .map((e) => {
+        const rich = allPois.find((p) => String(p.id) === e.id);
+        if (rich) return { ...rich };
+        return {
+          id: e.id,
+          lat: e.lat,
+          lng: e.lng,
+          name: e.name || e.id,
+          category: e.category || "activities",
+          tags: {},
+        };
+      });
+  }, [favoriteEntries, filteredPois, allPois]);
+
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (filters.radius < 99999) n++;
@@ -2028,8 +2170,52 @@ export default function Kaart() {
   }, [filters]);
 
   const filterHint = allPois.length > 0 && filteredPois.length === 0;
-  const showBlockingOverlay = loadError != null || (loading && allPois.length === 0);
-  const showRefreshBanner = loading && allPois.length > 0;
+  const showBlockingOverlay = loadError != null || loading || isApplyingFilters;
+  const loadingVariant = isApplyingFilters || loading
+    ? "radiusExpand"
+    : "default";
+  const effectiveRadius = filters.radius < 99999 ? filters.radius : radius;
+  /** Admin debug card: single source tag, fallback hint, elapsed (see LoadingOverlay). */
+  const loaderDebugData = useMemo(() => {
+    const m = poiFetchMeta;
+    let source = "pending";
+    if (m) {
+      if (m.dataSource === "client-cache") source = "cache";
+      else if (m.dataSource === "supabase") source = "own";
+      else source = "overpass";
+    }
+    const inNl =
+      userLocation?.lat != null && userLocation?.lng != null
+        ? isInNetherlands(userLocation.lat, userLocation.lng)
+        : null;
+    return {
+      source,
+      elapsedSec: loadDebugElapsedMs / 1000,
+      pendingInNl: inNl,
+    };
+  }, [loadDebugElapsedMs, poiFetchMeta, userLocation?.lat, userLocation?.lng]);
+
+  useEffect(() => {
+    if (stage !== "app") return;
+    if (!userLocation?.lat || !userLocation?.lng) return;
+    if (effectiveRadius >= 99999) return;
+    const map = mapRef.current;
+    if (!map?.fitBounds) return;
+
+    const latDelta = effectiveRadius / 111320;
+    const lngFactor = Math.max(Math.cos((userLocation.lat * Math.PI) / 180), 0.01);
+    const lngDelta = effectiveRadius / (111320 * lngFactor);
+    const bounds = [
+      [userLocation.lat - latDelta, userLocation.lng - lngDelta],
+      [userLocation.lat + latDelta, userLocation.lng + lngDelta],
+    ];
+
+    map.fitBounds(bounds, {
+      padding: [32, 32],
+      animate: true,
+      duration: 0.7,
+    });
+  }, [effectiveRadius, stage, userLocation?.lat, userLocation?.lng]);
 
   // ── Render landing ────────────────────────────────────────────────────────
   if (stage === "landing") {
@@ -2088,13 +2274,15 @@ export default function Kaart() {
           setTheme={setTheme}
           pois={filteredPois}
           userLocation={userLocation}
-          radius={radius}
+          radius={effectiveRadius}
           activeCats={activeCats}
           onToggleCat={toggleCat}
-          favorites={allPois.filter((p) => isFavorite(p.id)).map((p) => p.id)}
+          favorites={favorites}
+          mapExtraFavoritePois={mapExtraFavoritePois}
           onToggleFav={toggleFav}
           filters={filters}
           setFilters={setFilters}
+          onApplyFilters={applyFilters}
           selected={selected}
           setSelected={setSelected}
           showFilters={showFilters}
@@ -2118,7 +2306,9 @@ export default function Kaart() {
           loadedPoiCount={allPois.length}
           showFilterHint={filterHint}
           onClearFilters={clearVisibilityFilters}
-          refreshing={showRefreshBanner}
+          adminLoaderDebug={adminLoaderDebug}
+          setAdminLoaderDebug={setAdminLoaderDebug}
+          favoritePoisForList={favoritePoisForList}
         />
       ) : (
         <div
@@ -2130,9 +2320,10 @@ export default function Kaart() {
             background: "var(--bg)",
           }}
         >
-          <MapRefreshBanner lang={lang} visible={showRefreshBanner} />
           <Map
             pois={filteredPois}
+            extraFavoritePois={mapExtraFavoritePois}
+            favoriteIds={favorites}
             onBoundsChange={() => {}}
             onSelectPoi={(p) => {
               setSelected(p);
@@ -2140,7 +2331,7 @@ export default function Kaart() {
             }}
             mapRef={mapRef}
             userLocation={userLocation}
-            radius={radius}
+            radius={effectiveRadius}
             manualMode={manualMode}
             onLocationSet={handleManualPin}
             theme={themeState}
@@ -2172,7 +2363,7 @@ export default function Kaart() {
           <BottomSheet
             lang={lang}
             pois={filteredPois}
-            favorites={allPois.filter((p) => isFavorite(p.id)).map((p) => p.id)}
+            favorites={favorites}
             onToggleFav={toggleFav}
             onPickPoi={(p) => {
               setSelected(p);
@@ -2199,7 +2390,7 @@ export default function Kaart() {
           {showFavs && (
             <FavoritesPanel
               lang={lang}
-              favorites={allPois.filter((p) => isFavorite(p.id))}
+              favorites={favoritePoisForList}
               onClose={() => setShowFavs(false)}
               onPickPoi={(p) => {
                 setShowFavs(false);
@@ -2214,6 +2405,7 @@ export default function Kaart() {
               lang={lang}
               filters={filters}
               setFilters={setFilters}
+              onApply={applyFilters}
               activeCats={activeCats}
               onToggleCat={toggleCat}
               onClose={() => setShowFilters(false)}
@@ -2227,6 +2419,9 @@ export default function Kaart() {
               theme={themeState}
               setTheme={setTheme}
               user={user}
+              isAdmin={isAdmin}
+              adminLoaderDebug={adminLoaderDebug}
+              setAdminLoaderDebug={setAdminLoaderDebug}
               onClose={() => setShowSettings(false)}
               onOpenAdmin={() => {
                 setShowSettings(false);
@@ -2246,6 +2441,9 @@ export default function Kaart() {
         <LoadingOverlay
           error={loadError}
           onRetry={loadError ? retryLoad : null}
+          variant={loadingVariant}
+          debugEnabled={isAdmin && adminLoaderDebug}
+          debugData={loaderDebugData}
         />
       )}
     </div>

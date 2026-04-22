@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 /* ── Translations ─────────────────────────────────────────────── */
@@ -108,11 +109,32 @@ function Toggle({ label, value, onChange }) {
   )
 }
 
-function Body({ lang, filters, setFilters, onClose, embedded }) {
+function Body({ lang, filters, setFilters, onApply, onClose, embedded }) {
   const c = COPY[lang] || COPY.nl
+  const [draftFilters, setDraftFilters] = useState(filters)
+  const [isApplying, setIsApplying] = useState(false)
+
+  useEffect(() => {
+    setDraftFilters(filters)
+  }, [filters])
 
   function resetAll() {
-    setFilters({ radius: 10000, price: 'any', openOnly: false, minRating: 0 })
+    setDraftFilters({ radius: 10000, price: 'any', openOnly: false, minRating: 0 })
+  }
+
+  async function applyFilters() {
+    if (isApplying) return
+    setIsApplying(true)
+    try {
+      if (onApply) {
+        await onApply(draftFilters)
+      } else {
+        setFilters(draftFilters)
+      }
+      onClose()
+    } finally {
+      setIsApplying(false)
+    }
   }
 
   return (
@@ -150,24 +172,24 @@ function Body({ lang, filters, setFilters, onClose, embedded }) {
         <SectionLabel>{c.radius}</SectionLabel>
         <PillRow
           options={RADIUS_OPTIONS}
-          value={filters.radius ?? 10000}
-          onChange={v => setFilters(f => ({ ...f, radius: v }))}
+          value={draftFilters.radius ?? 10000}
+          onChange={v => setDraftFilters(f => ({ ...f, radius: v }))}
         />
 
         {/* Price */}
         <SectionLabel>{c.price}</SectionLabel>
         <PillRow
           options={[{ label: c.any, value: 'any' }, { label: c.free, value: 'free' }]}
-          value={filters.price ?? 'any'}
-          onChange={v => setFilters(f => ({ ...f, price: v }))}
+          value={draftFilters.price ?? 'any'}
+          onChange={v => setDraftFilters(f => ({ ...f, price: v }))}
         />
 
         {/* Open only */}
         <div style={{ marginTop: 16 }}>
           <Toggle
             label={c.openNow}
-            value={!!filters.openOnly}
-            onChange={v => setFilters(f => ({ ...f, openOnly: v }))}
+            value={!!draftFilters.openOnly}
+            onChange={v => setDraftFilters(f => ({ ...f, openOnly: v }))}
           />
         </div>
       </div>
@@ -183,12 +205,13 @@ function Body({ lang, filters, setFilters, onClose, embedded }) {
           border: '1px solid var(--line)', cursor: 'pointer',
           fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
         }}>{c.reset}</button>
-        <button onClick={onClose} style={{
+        <button onClick={applyFilters} disabled={isApplying} style={{
           flex: 2, padding: '12px', borderRadius: 'var(--r-pill)',
-          background: 'var(--ink)', color: 'var(--bg)',
-          border: 'none', cursor: 'pointer',
+          background: isApplying ? 'var(--line)' : 'var(--ink)',
+          color: isApplying ? 'var(--ink-faint)' : 'var(--bg)',
+          border: 'none', cursor: isApplying ? 'wait' : 'pointer',
           fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600,
-        }}>{c.apply}</button>
+        }}>{isApplying ? `${c.apply}...` : c.apply}</button>
       </div>
     </div>
   )

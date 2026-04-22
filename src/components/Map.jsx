@@ -12,6 +12,16 @@ const CAT_HEX = {
   activities: '#c8a030',   // amber
 }
 
+/* Favoriet-accent = logo-geel/amber, in lijn met bestaande pins */
+const FAV = {
+  heart: '#ffffff',
+  badgeTop: '#ffbe33',
+  badgeBottom: '#ffb113',
+  onlyTop: '#ffc64a',
+  onlyBottom: '#ffb113',
+  border: 'rgba(255, 177, 19, 0.6)',
+}
+
 /* ── Inline category icon paths (SVG strings for divIcon) ────── */
 function catIconPaths(cat) {
   const s = 'rgba(26,18,8,0.92)'
@@ -44,13 +54,20 @@ function catIconPaths(cat) {
   return `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${s}"/>`
 }
 
-/* ── Teardrop pin SVG ──────────────────────────────────────────── */
-function pinHtml(color, category, size = 'normal', delayMs = 0) {
+/* ── Teardrop pin SVG — optional heart badge for favorites ─────── */
+function pinHtml(color, category, size = 'normal', delayMs = 0, withHeart = false) {
   const w = size === 'large' ? 28 : 22
   const h = size === 'large' ? 36 : 28
   const r = size === 'large' ? 5 : 4
+  const heartBadge = withHeart
+    ? `<div style="position:absolute;right:-2px;top:0;width:11px;height:11px;border-radius:50%;
+        background:linear-gradient(180deg,${FAV.badgeTop},${FAV.badgeBottom});display:flex;align-items:center;justify-content:center;
+        border:1px solid ${FAV.border};box-shadow:0 1px 3px rgba(0,0,0,.1);z-index:2;
+        font-size:6.5px;color:${FAV.heart};line-height:1">♥</div>`
+    : ''
   return `
     <div style="position:relative;width:${w}px;height:${h}px;animation:hs-pin-fall 1.05s cubic-bezier(.2,.8,.2,1) ${delayMs}ms both;">
+      ${heartBadge}
       <svg width="${w}" height="${h}" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">
         <path d="M14 1C7.37 1 2 6.37 2 13c0 8 10.5 20 12 21.5 1.5-1.5 12-13.5 12-21.5C26 6.37 20.63 1 14 1z" fill="${color}"/>
         <circle cx="14" cy="13" r="${r + 3}" fill="rgba(255,255,255,0.9)"/>
@@ -59,14 +76,34 @@ function pinHtml(color, category, size = 'normal', delayMs = 0) {
     </div>`
 }
 
-function createCategoryIcon(category, selected = false, delayMs = 0) {
+function createCategoryIcon(category, selected = false, delayMs = 0, isFavorite = false) {
   const color = CAT_HEX[category] || '#888'
   return L.divIcon({
     className: '',
-    html: pinHtml(color, category, selected ? 'large' : 'normal', delayMs),
+    html: pinHtml(color, category, selected ? 'large' : 'normal', delayMs, isFavorite),
     iconSize: selected ? [28, 36] : [22, 28],
     iconAnchor: selected ? [14, 36] : [11, 28],
     popupAnchor: [0, -36],
+  })
+}
+
+/* Favorite-only: logo-geel en duidelijkere hart-glyph in de grotere cirkel */
+function createHeartOnlyIcon(category) {
+  const cat = CAT_HEX[category] || '#888'
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="position:relative;width:28px;height:28px;animation:hs-pin-fall 0.85s cubic-bezier(.2,.8,.2,1) both;">
+        <div style="position:absolute;inset:0;border-radius:50%;
+          background:linear-gradient(160deg,${FAV.onlyTop},${FAV.onlyBottom});
+          box-shadow:0 2px 6px rgba(0,0,0,.12),0 0 0 1.5px ${FAV.border},0 0 0 2.5px ${cat}22;
+          display:flex;align-items:center;justify-content:center;
+          font-size:14px;color:${FAV.heart};line-height:1;font-weight:700;filter:drop-shadow(0 1px 1px rgba(0,0,0,.1));
+        ">♥</div>
+      </div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
   })
 }
 
@@ -135,15 +172,7 @@ function FlyTo({ location }) {
     if (location?.lat && location?.lng) {
       map.flyTo([location.lat, location.lng], 15, { duration: 1.4 })
     }
-  }, [location?.lat, location?.lng])
-  return null
-}
-
-function TileUpdater({ theme }) {
-  const map = useMap()
-  useEffect(() => {
-    // Force tile layer refresh isn't needed; re-mount via key does this
-  }, [theme])
+  }, [location, map])
   return null
 }
 
@@ -153,6 +182,8 @@ const GRONINGEN = [53.2194, 6.5665]
 
 export default function Map({
   pois = [],
+  /** POIs in favorites to show on map, not in `pois` (e.g. outside filter) — with lat/lng */
+  extraFavoritePois = [],
   onBoundsChange,
   onSelectPoi,
   mapRef,
@@ -163,7 +194,12 @@ export default function Map({
   theme = 'light',
   selectedId,
   pinDropCycle = 0,
+  /** Place ids that are favorites — used for heart on main markers */
+  favoriteIds = [],
 }) {
+  const favoriteSet = new Set(
+    Array.isArray(favoriteIds) ? favoriteIds.map(String) : [],
+  )
   return (
     <MapContainer
       center={userLocation?.lat ? [userLocation.lat, userLocation.lng] : GRONINGEN}
@@ -203,18 +239,34 @@ export default function Map({
         />
       )}
 
-      {/* POI pins */}
-      {pois.map(poi => (
+      {/* POI pins (favorites get a heart badge) */}
+      {pois.map(poi => {
+        const isFav = favoriteSet.has(String(poi.id))
+        const d = Math.min(700, (Math.abs(String(poi.id).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 7) * 90)
+        return (
+          <Marker
+            key={`${poi.id}-${pinDropCycle}`}
+            position={[poi.lat, poi.lng]}
+            icon={createCategoryIcon(
+              poi.category,
+              poi.id === selectedId,
+              d,
+              isFav,
+            )}
+            eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
+            zIndexOffset={poi.id === selectedId ? 500 : (isFav ? 100 : 0)}
+          />
+        )
+      })}
+
+      {/* Favorites with coords, not in the current `pois` list (e.g. filtered out or off-area) */}
+      {extraFavoritePois.map(poi => (
         <Marker
-          key={`${poi.id}-${pinDropCycle}`}
+          key={`fav-${poi.id}-${pinDropCycle}`}
           position={[poi.lat, poi.lng]}
-          icon={createCategoryIcon(
-            poi.category,
-            poi.id === selectedId,
-            Math.min(700, (Math.abs(String(poi.id).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 7) * 90),
-          )}
+          icon={createHeartOnlyIcon(poi.category)}
           eventHandlers={{ click: () => onSelectPoi && onSelectPoi(poi) }}
-          zIndexOffset={poi.id === selectedId ? 500 : 0}
+          zIndexOffset={poi.id === selectedId ? 450 : 80}
         />
       ))}
     </MapContainer>
