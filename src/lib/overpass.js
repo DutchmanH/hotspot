@@ -409,7 +409,7 @@ export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
   const inner = Object.entries(CATEGORY_QUERIES)
     .map(([, fn]) => fn(bbox))
     .join('')
-  const query = `[out:json][timeout:45];(${inner});out center 200;`
+  const query = `[out:json][timeout:45];(${inner});out center;`
 
   const tOv = performance.now()
   const data = await fetchOverpass(query, 0, signal)
