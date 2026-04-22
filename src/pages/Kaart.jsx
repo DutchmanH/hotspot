@@ -1853,6 +1853,7 @@ export default function Kaart() {
   const loadClockStartRef = useRef(0);
   const boundsFetchDebounceRef = useRef(null);
   const boundsFetchRequestRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   const clearVisibilityFilters = useCallback(() => {
     setActiveCats([]);
@@ -1927,6 +1928,7 @@ export default function Kaart() {
     const ac = new AbortController();
     poiFetchAbortRef.current = ac;
 
+    isFetchingRef.current = true;
     setLastSearch({ lat, lng, r });
     setLoadError(null);
     loadClockStartRef.current = performance.now();
@@ -1989,6 +1991,7 @@ export default function Kaart() {
       setLoadError({ code });
     } finally {
       if (reqId === requestSeqRef.current) {
+        isFetchingRef.current = false;
         setLoadPipelinePhase("idle");
         loadClockStartRef.current = 0;
         setLoading(false);
@@ -2066,6 +2069,7 @@ export default function Kaart() {
     (bounds) => {
       if (!bounds || !userLocation?.lat || !userLocation?.lng) return;
       if (manualMode) return;
+      if (isFetchingRef.current) return;
 
       const centerLat = userLocation.lat;
       const centerLng = userLocation.lng;
