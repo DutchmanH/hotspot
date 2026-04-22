@@ -1,0 +1,32 @@
+name: Sync NL POIs
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # Dagelijks om 3:00 UTC
+  workflow_dispatch:       # Handmatig triggeren via GitHub UI → Actions
+
+jobs:
+  sync:
+    name: Sync POIs voor Nederland
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js instellen
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Dependencies installeren
+        run: npm install
+        working-directory: scripts
+
+      - name: POIs synchroniseren
+        run: node sync-pois.js
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

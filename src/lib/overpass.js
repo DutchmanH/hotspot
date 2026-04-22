@@ -1,4 +1,13 @@
+import { supabase } from './supabase.js'
+
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+
+// Bounding box van Nederland — POIs binnen dit gebied komen uit Supabase
+const NL_BOUNDS = { minLat: 50.5, maxLat: 53.7, minLng: 3.3, maxLng: 7.3 }
+function isInNetherlands(lat, lng) {
+  return lat >= NL_BOUNDS.minLat && lat <= NL_BOUNDS.maxLat
+      && lng >= NL_BOUNDS.minLng && lng <= NL_BOUNDS.maxLng
+}
 
 /** Gooit een Error met een .code property zodat de UI het type kan tonen. */
 function codeError(message, code) {
@@ -279,6 +288,27 @@ function parseElements(elements, category) {
     }))
 }
 
+/**
+ * Haalt POIs op uit de Supabase cache (dagelijks gesynchroniseerd voor Nederland).
+ * Mapt het resultaat naar hetzelfde formaat als de Overpass parser.
+ */
+async function fetchPOIsFromSupabase(lat, lng, radiusKm) {
+  const { data, error } = await supabase.rpc('get_pois_near', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_km: radiusKm,
+  })
+  if (error) throw error
+  return (data || []).map(row => ({
+    id: row.osm_id,
+    lat: row.lat,
+    lng: row.lng,
+    name: row.name,
+    tags: row.tags || {},
+    category: row.category,
+  }))
+}
+
 export async function fetchPOIs(category, bounds) {
   const bbox = getBbox(bounds)
   const inner = CATEGORY_QUERIES[category](bbox)
@@ -310,6 +340,22 @@ export async function fetchAllPOIs(lat, lng, radiusKm, signal) {
       ...p,
       tags: { ...p.tags },
     }))
+  }
+
+  // Gebruik Supabase cache voor locaties in Nederland
+  if (isInNetherlands(lat, lng)) {
+    try {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+      const supabasePois = await fetchPOIsFromSupabase(lat, lng, radiusKm)
+      if (supabasePois.length > 0) {
+        writePoiCache(lat, lng, radiusKm, supabasePois)
+        return supabasePois.map((p) => ({ ...p, tags: { ...p.tags } }))
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') throw err
+      // Supabase niet beschikbaar of leeg — fallback naar Overpass
+      console.warn('Supabase POI cache niet beschikbaar, val terug op Overpass:', err.message)
+    }
   }
 
   const bbox = boundsFromRadius(lat, lng, radiusKm)
